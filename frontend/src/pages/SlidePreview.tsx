@@ -219,9 +219,9 @@ export const SlidePreview: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* 顶栏 */}
-      <header className="h-16 bg-white shadow-sm border-b border-gray-200 flex items-center justify-between px-6">
+      <header className="h-16 bg-white shadow-sm border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -301,10 +301,10 @@ export const SlidePreview: React.FC = () => {
       </header>
 
       {/* 主内容区 */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-hidden min-w-0 min-h-0">
         {/* 左侧：缩略图列表 */}
-        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
+        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <Button
               variant="primary"
               icon={<Sparkles size={18} />}
@@ -315,7 +315,7 @@ export const SlidePreview: React.FC = () => {
             </Button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
             {currentProject.pages.map((page, index) => (
               <SlideCard
                 key={page.id}
@@ -334,9 +334,9 @@ export const SlidePreview: React.FC = () => {
         </aside>
 
         {/* 右侧：大图预览 */}
-        <main className="flex-1 flex flex-col bg-gradient-to-br from-banana-50 via-white to-gray-50">
+        <main className="flex-1 flex flex-col bg-gradient-to-br from-banana-50 via-white to-gray-50 min-w-0 overflow-hidden">
           {currentProject.pages.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center overflow-y-auto">
               <div className="text-center">
                 <div className="text-6xl mb-4">📊</div>
                 <h3 className="text-xl font-semibold text-gray-700 mb-2">
@@ -356,7 +356,7 @@ export const SlidePreview: React.FC = () => {
           ) : (
             <>
               {/* 预览区 */}
-              <div className="flex-1 flex items-center justify-center p-8">
+              <div className="flex-1 overflow-y-auto min-h-0 flex items-center justify-center p-8">
                 <div className="max-w-5xl w-full">
                   <div className="relative aspect-video bg-white rounded-lg shadow-xl overflow-hidden">
                     {selectedPage?.generated_image_path ? (
@@ -390,7 +390,7 @@ export const SlidePreview: React.FC = () => {
               </div>
 
               {/* 控制栏 */}
-              <div className="bg-white border-t border-gray-200 px-6 py-4">
+              <div className="bg-white border-t border-gray-200 px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between max-w-5xl mx-auto">
                   {/* 导航 */}
                   <div className="flex items-center gap-2">
