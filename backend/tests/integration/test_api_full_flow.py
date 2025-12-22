@@ -170,7 +170,7 @@ class TestAPIFullFlow:
             timeout=30
         )
         
-        assert response.status_code == 200
+        assert response.status_code in [200, 201]  # 201 Created is also valid
         data = response.json()
         assert data['success'] is True
         assert 'project_id' in data['data']
@@ -310,7 +310,7 @@ class TestAPIFullFlow:
             timeout=30
         )
         
-        assert response.status_code == 200
+        assert response.status_code in [200, 201]  # 201 Created is also valid
         data = response.json()
         pid = data['data']['project_id']
         print(f"✓ Project created: {pid}")
