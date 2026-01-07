@@ -597,6 +597,22 @@ banana-slides/
 <p>感谢AIHubMix对本项目的赞助</p>
 </div>
 
+
+<div align="center">
+
+
+ <img width="100" alt="image" src="https://github.com/user-attachments/assets/ac2ad6ec-c1cf-4aaa-859c-756b54168c96" />
+
+<details>
+  <summary>感谢<a href="https://api.chatfire.site/login?inviteCode=A15CD6A0">AI火宝</a>对本项目的赞助</summary>
+  “聚合全球多模型API服务商。更低价格享受安全、稳定且72小时链接全球最新模型的服务。”
+</details>
+
+  
+</div>
+
+
+
 ## 致谢
 
 - 项目贡献者们：
