@@ -1,16 +1,21 @@
 /**
  * Login page with Google OAuth
  */
-import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { isAuthEnabled } from '@/lib/supabase';
 
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, isInitialized, isLoading, signInWithGoogle } =
     useAuthStore();
+
+  // Check for error in URL params
+  const errorType = searchParams.get('error');
+  const [showError, setShowError] = useState(!!errorType);
 
   // Redirect to home if already authenticated
   useEffect(() => {
@@ -48,6 +53,31 @@ export function Login() {
           </h1>
           <p className="text-gray-600">AI-Powered PPT Generator</p>
         </div>
+
+        {/* Error message for forbidden access */}
+        {showError && errorType === 'forbidden' && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="text-red-800 font-medium">Access Denied</p>
+                <p className="text-red-600 text-sm mt-1">
+                  Your account is not authorized to access this service. Please contact the administrator.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowError(false)}
+                className="text-red-400 hover:text-red-600 ml-auto"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           <button

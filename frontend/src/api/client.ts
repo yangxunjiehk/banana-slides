@@ -103,6 +103,17 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle 403 Forbidden - user not in whitelist
+    if (error.response?.status === 403 && isAuthEnabled && supabase) {
+      console.error('Access forbidden - user not in whitelist');
+      localStorage.removeItem('currentProjectId');
+      // Sign out the user to clear their session (prevent redirect loop)
+      await supabase.auth.signOut();
+      // Redirect to login with error message
+      window.location.href = '/login?error=forbidden';
+      return Promise.reject(error);
+    }
+
     // 统一错误处理
     if (error.response) {
       // 服务器返回错误状态码

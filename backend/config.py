@@ -112,6 +112,11 @@ class Config:
     SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET', '')
 
+    # 邮箱白名单 (可选，不配置则允许所有已登录用户访问)
+    # 格式: 逗号分隔的邮箱列表，如 "user1@gmail.com,user2@gmail.com"
+    _allowed_emails_raw = os.getenv('ALLOWED_EMAILS', '')
+    ALLOWED_EMAILS = [e.strip().lower() for e in _allowed_emails_raw.split(',') if e.strip()] if _allowed_emails_raw else []
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

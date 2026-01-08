@@ -125,8 +125,8 @@ def create_app():
         # Initialize current_user to None
         g.current_user = None
 
-        # Skip paths that don't require authentication
-        skip_paths = ['/health', '/', '/api/health', '/api/output-language']
+        # Skip paths that don't require authentication (or handle auth themselves)
+        skip_paths = ['/health', '/', '/api/health', '/api/output-language', '/api/auth/verify']
         if any(request.path == p or request.path.startswith(p + '/') for p in skip_paths):
             return
 
@@ -160,6 +160,14 @@ def create_app():
         if err:
             return error_response('UNAUTHORIZED', err, 401)
 
+        # Check email whitelist (if configured)
+        allowed_emails = app.config.get('ALLOWED_EMAILS', [])
+        if allowed_emails:
+            user_email = (user.get('email') or '').lower()
+            if user_email not in allowed_emails:
+                logging.warning(f"Access denied for email: {user_email} (not in whitelist)")
+                return error_response('FORBIDDEN', 'Your account is not authorized to access this service', 403)
+
         g.current_user = user
 
     with app.app_context():
@@ -170,6 +178,44 @@ def create_app():
     @app.route('/health')
     def health_check():
         return {'status': 'ok', 'message': 'Banana Slides API is running'}
+
+    # Auth verification endpoint - checks if user is in whitelist
+    @app.route('/api/auth/verify', methods=['GET'])
+    def verify_auth():
+        """
+        Verify if the current user is authorized (in whitelist).
+        This endpoint is called after OAuth callback to check access before entering the app.
+        """
+        from middleware.auth import is_auth_enabled, verify_token
+
+        # If auth is not enabled, always allow
+        if not is_auth_enabled():
+            return {'authorized': True}
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return error_response('UNAUTHORIZED', 'Missing authorization header', 401)
+
+        try:
+            parts = auth_header.split()
+            if len(parts) != 2 or parts[0].lower() != 'bearer':
+                raise ValueError("Invalid format")
+            token = parts[1]
+        except ValueError:
+            return error_response('UNAUTHORIZED', 'Invalid authorization header format', 401)
+
+        user, err = verify_token(token)
+        if err:
+            return error_response('UNAUTHORIZED', err, 401)
+
+        # Check email whitelist
+        allowed_emails = app.config.get('ALLOWED_EMAILS', [])
+        if allowed_emails:
+            user_email = (user.get('email') or '').lower()
+            if user_email not in allowed_emails:
+                return error_response('FORBIDDEN', 'Your account is not authorized to access this service', 403)
+
+        return {'authorized': True, 'email': user.get('email')}
     
     # Output language endpoint
     @app.route('/api/output-language', methods=['GET'])
