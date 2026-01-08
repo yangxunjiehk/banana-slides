@@ -45,16 +45,59 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Track if we're already refreshing to avoid multiple refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
 // 响应拦截器
 apiClient.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    // Handle 401 Unauthorized - redirect to login
-    if (error.response?.status === 401 && isAuthEnabled) {
-      console.error('Unauthorized - redirecting to login');
-      // Clear local storage and redirect
+  async (error) => {
+    // Handle 401 Unauthorized - try to refresh token first
+    if (error.response?.status === 401 && isAuthEnabled && supabase) {
+      console.warn('401 received, attempting token refresh...');
+
+      // Avoid multiple simultaneous refresh attempts
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = (async () => {
+          try {
+            const { data, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError || !data.session) {
+              console.error('Token refresh failed:', refreshError);
+              return false;
+            }
+            console.log('Token refreshed successfully');
+            return true;
+          } catch (e) {
+            console.error('Token refresh error:', e);
+            return false;
+          } finally {
+            isRefreshing = false;
+          }
+        })();
+      }
+
+      // Wait for refresh to complete
+      const refreshed = await refreshPromise;
+
+      if (refreshed && error.config) {
+        // Retry the original request with new token
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            error.config.headers.Authorization = `Bearer ${session.access_token}`;
+            return apiClient.request(error.config);
+          }
+        } catch (retryError) {
+          console.error('Retry after refresh failed:', retryError);
+        }
+      }
+
+      // If refresh failed or retry failed, redirect to login
+      console.error('Authentication failed - redirecting to login');
       localStorage.removeItem('currentProjectId');
       window.location.href = '/login';
       return Promise.reject(error);
