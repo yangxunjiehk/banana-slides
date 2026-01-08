@@ -11,6 +11,7 @@ from utils import (
     error_response, not_found, bad_request, success_response,
     parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages
 )
+from utils.tenant import require_project_ownership
 from services import ExportService, FileService
 from services.ai_service_manager import get_ai_service
 

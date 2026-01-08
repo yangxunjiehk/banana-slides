@@ -5,6 +5,7 @@ import logging
 from flask import Blueprint, request, current_app
 from models import db, Project, Page, PageImageVersion, Task
 from utils import success_response, error_response, not_found, bad_request
+from utils.tenant import require_project_ownership
 from services import FileService, ProjectContext
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, generate_single_page_image_task, edit_page_image_task
@@ -24,7 +25,7 @@ page_bp = Blueprint('pages', __name__, url_prefix='/api/projects')
 def create_page(project_id):
     """
     POST /api/projects/{project_id}/pages - Add new page
-    
+
     Request body:
     {
         "order_index": 2,
@@ -33,10 +34,10 @@ def create_page(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         data = request.get_json()
         
@@ -82,8 +83,13 @@ def delete_page(project_id, page_id):
     DELETE /api/projects/{project_id}/pages/{page_id} - Delete page
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
         
@@ -112,15 +118,20 @@ def delete_page(project_id, page_id):
 def update_page_outline(project_id, page_id):
     """
     PUT /api/projects/{project_id}/pages/{page_id}/outline - Edit page outline
-    
+
     Request body:
     {
         "outline_content": {"title": "...", "points": [...]}
     }
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
         
@@ -150,7 +161,7 @@ def update_page_outline(project_id, page_id):
 def update_page_description(project_id, page_id):
     """
     PUT /api/projects/{project_id}/pages/{page_id}/description - Edit description
-    
+
     Request body:
     {
         "description_content": {
@@ -161,8 +172,13 @@ def update_page_description(project_id, page_id):
     }
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
         
@@ -192,21 +208,22 @@ def update_page_description(project_id, page_id):
 def generate_page_description(project_id, page_id):
     """
     POST /api/projects/{project_id}/pages/{page_id}/generate/description - Generate single page description
-    
+
     Request body:
     {
         "force_regenerate": false
     }
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
-        
-        project = Project.query.get(project_id)
-        if not project:
-            return not_found('Project')
         
         data = request.get_json() or {}
         force_regenerate = data.get('force_regenerate', False)
@@ -276,7 +293,7 @@ def generate_page_description(project_id, page_id):
 def generate_page_image(project_id, page_id):
     """
     POST /api/projects/{project_id}/pages/{page_id}/generate/image - Generate single page image
-    
+
     Request body:
     {
         "use_template": true,
@@ -284,14 +301,15 @@ def generate_page_image(project_id, page_id):
     }
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
-        
-        project = Project.query.get(project_id)
-        if not project:
-            return not_found('Project')
         
         data = request.get_json() or {}
         use_template = data.get('use_template', True)
@@ -453,7 +471,7 @@ def generate_page_image(project_id, page_id):
 def edit_page_image(project_id, page_id):
     """
     POST /api/projects/{project_id}/pages/{page_id}/edit/image - Edit page image
-    
+
     Request body (JSON or multipart/form-data):
     {
         "edit_instruction": "更改文本框样式为虚线",
@@ -463,7 +481,7 @@ def edit_page_image(project_id, page_id):
             "uploaded_image_ids": ["file1", "file2"]  // 上传的图片文件ID列表（在multipart中）
         }
     }
-    
+
     For multipart/form-data:
     - edit_instruction: text field
     - use_template: text field (true/false)
@@ -471,17 +489,18 @@ def edit_page_image(project_id, page_id):
     - context_images: file uploads (multiple files with key "context_images")
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
-        
+
         if not page.generated_image_path:
             return bad_request("Page must have generated image first")
-        
-        project = Project.query.get(project_id)
-        if not project:
-            return not_found('Project')
         
         # Initialize services
         ai_service = get_ai_service()
@@ -629,8 +648,13 @@ def get_page_image_versions(project_id, page_id):
     GET /api/projects/{project_id}/pages/{page_id}/image-versions - Get all image versions for a page
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
         
@@ -652,8 +676,13 @@ def set_current_image_version(project_id, page_id, version_id):
     Set a specific version as the current one
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         page = Page.query.get(page_id)
-        
+
         if not page or page.project_id != project_id:
             return not_found('Page')
         

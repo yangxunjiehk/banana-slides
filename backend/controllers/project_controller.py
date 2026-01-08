@@ -23,6 +23,10 @@ from utils import (
     success_response, error_response, not_found, bad_request,
     parse_page_ids_from_body, get_filtered_pages
 )
+from utils.tenant import (
+    get_current_user_id, require_project_ownership,
+    user_filtered_query, set_user_id_on_create
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,23 +122,28 @@ def _reconstruct_outline_from_pages(pages: list) -> list:
 def list_projects():
     """
     GET /api/projects - Get all projects (for history)
-    
+
     Query params:
     - limit: number of projects to return (default: 50, max: 100)
     - offset: offset for pagination (default: 0)
+
+    Note: Returns only projects belonging to the authenticated user (multi-tenant)
     """
     try:
         # Parameter validation
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
-        
+
         # Enforce limits to prevent performance issues
         limit = min(max(1, limit), 100)  # Between 1-100
         offset = max(0, offset)  # Non-negative
-        
+
+        # Build query with user filtering for multi-tenant isolation
+        query = user_filtered_query(Project)
+
         # Fetch limit + 1 items to check for more pages efficiently
         # This avoids a second database query
-        projects_with_extra = Project.query\
+        projects_with_extra = query\
             .options(joinedload(Project.pages))\
             .order_by(desc(Project.updated_at))\
             .limit(limit + 1)\
@@ -187,16 +196,17 @@ def create_project():
         if creation_type not in ['idea', 'outline', 'descriptions']:
             return bad_request("Invalid creation_type")
         
-        # Create project
+        # Create project with user_id for multi-tenant isolation
         project = Project(
             creation_type=creation_type,
             idea_prompt=data.get('idea_prompt'),
             outline_text=data.get('outline_text'),
             description_text=data.get('description_text'),
             template_style=data.get('template_style'),
-            status='DRAFT'
+            status='DRAFT',
+            user_id=get_current_user_id()  # Set user_id for multi-tenant
         )
-        
+
         db.session.add(project)
         db.session.commit()
         
@@ -223,17 +233,19 @@ def create_project():
 def get_project(project_id):
     """
     GET /api/projects/{project_id} - Get project details
+
+    Note: Only returns project if it belongs to the authenticated user
     """
     try:
-        # Use eager loading to load project and related pages
-        project = Project.query\
-            .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
-            .first()
-        
-        if not project:
-            return not_found('Project')
-        
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
+        # Eager load pages for full response
+        db.session.refresh(project)
+        project.pages  # Trigger lazy load
+
         return success_response(project.to_dict(include_pages=True))
     
     except Exception as e:
@@ -245,22 +257,20 @@ def get_project(project_id):
 def update_project(project_id):
     """
     PUT /api/projects/{project_id} - Update project
-    
+
     Request body:
     {
         "idea_prompt": "...",
         "pages_order": ["page-uuid-1", "page-uuid-2", ...]
     }
+
+    Note: Only updates project if it belongs to the authenticated user
     """
     try:
-        # Use eager loading to load project and pages (for page order updates)
-        project = Project.query\
-            .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
-            .first()
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         data = request.get_json()
         
@@ -314,12 +324,14 @@ def update_project(project_id):
 def delete_project(project_id):
     """
     DELETE /api/projects/{project_id} - Delete project
+
+    Note: Only deletes project if it belongs to the authenticated user
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         # Delete project files
         from services import FileService
@@ -342,10 +354,10 @@ def delete_project(project_id):
 def generate_outline(project_id):
     """
     POST /api/projects/{project_id}/generate/outline - Generate outline
-    
+
     For 'idea' type: Generate outline from idea_prompt
     For 'outline' type: Parse outline_text into structured format
-    
+
     Request body (optional):
     {
         "idea_prompt": "...",  # for idea type
@@ -353,10 +365,10 @@ def generate_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         # Get singleton AI service instance
         ai_service = get_ai_service()
@@ -448,25 +460,25 @@ def generate_outline(project_id):
 def generate_from_description(project_id):
     """
     POST /api/projects/{project_id}/generate/from-description - Generate outline and page descriptions from description text
-    
+
     This endpoint:
     1. Parses the description_text to extract outline structure
     2. Splits the description_text into individual page descriptions
     3. Creates pages with both outline and description content filled
     4. Sets project status to DESCRIPTIONS_GENERATED
-    
+
     Request body (optional):
     {
         "description_text": "...",  # if not provided, uses project.description_text
         "language": "zh"  # output language: zh, en, ja, auto
     }
     """
-    
+
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         if project.creation_type != 'descriptions':
             return bad_request("This endpoint is only for descriptions type projects")
@@ -565,7 +577,7 @@ def generate_from_description(project_id):
 def generate_descriptions(project_id):
     """
     POST /api/projects/{project_id}/generate/descriptions - Generate descriptions
-    
+
     Request body:
     {
         "max_workers": 5,
@@ -573,10 +585,10 @@ def generate_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         if project.status not in ['OUTLINE_GENERATED', 'DRAFT', 'DESCRIPTIONS_GENERATED']:
             return bad_request("Project must have outline generated first")
@@ -656,7 +668,7 @@ def generate_descriptions(project_id):
 def generate_images(project_id):
     """
     POST /api/projects/{project_id}/generate/images - Generate images
-    
+
     Request body:
     {
         "max_workers": 8,
@@ -666,10 +678,10 @@ def generate_images(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         # if project.status not in ['DESCRIPTIONS_GENERATED', 'OUTLINE_GENERATED']:
         #     return bad_request("Project must have descriptions generated first")
@@ -764,8 +776,13 @@ def get_task_status(project_id, task_id):
     GET /api/projects/{project_id}/tasks/{task_id} - Get task status
     """
     try:
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
+
         task = Task.query.get(task_id)
-        
+
         if not task or task.project_id != project_id:
             return not_found('Task')
         
@@ -780,7 +797,7 @@ def get_task_status(project_id, task_id):
 def refine_outline(project_id):
     """
     POST /api/projects/{project_id}/refine/outline - Refine outline based on user requirements
-    
+
     Request body:
     {
         "user_requirement": "用户要求，例如：增加一页关于XXX的内容",
@@ -788,10 +805,10 @@ def refine_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         data = request.get_json()
         
@@ -934,7 +951,7 @@ def refine_outline(project_id):
 def refine_descriptions(project_id):
     """
     POST /api/projects/{project_id}/refine/descriptions - Refine page descriptions based on user requirements
-    
+
     Request body:
     {
         "user_requirement": "用户要求，例如：让描述更详细一些",
@@ -942,10 +959,10 @@ def refine_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         data = request.get_json()
         

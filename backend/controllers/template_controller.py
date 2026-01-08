@@ -5,6 +5,10 @@ import logging
 from flask import Blueprint, request, current_app
 from models import db, Project, UserTemplate
 from utils import success_response, error_response, not_found, bad_request, allowed_file
+from utils.tenant import (
+    get_current_user_id, require_project_ownership,
+    user_filtered_query
+)
 from services import FileService
 from datetime import datetime
 
@@ -18,15 +22,15 @@ user_template_bp = Blueprint('user_templates', __name__, url_prefix='/api/user-t
 def upload_template(project_id):
     """
     POST /api/projects/{project_id}/template - Upload template image
-    
+
     Content-Type: multipart/form-data
     Form: template_image=@file.png
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         # Check if file is in request
         if 'template_image' not in request.files:
@@ -66,10 +70,10 @@ def delete_template(project_id):
     DELETE /api/projects/{project_id}/template - Delete template
     """
     try:
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return not_found('Project')
+        # Verify project ownership (multi-tenant)
+        project, error = require_project_ownership(project_id)
+        if error:
+            return error
         
         if not project.template_image_path:
             return bad_request("No template to delete")
@@ -142,17 +146,18 @@ def upload_user_template():
         # Generate template ID first
         import uuid
         template_id = str(uuid.uuid4())
-        
+
         # Save template file first (using the generated ID)
         file_service = FileService(current_app.config['UPLOAD_FOLDER'])
         file_path = file_service.save_user_template(file, template_id)
-        
-        # Create template record with file_path already set
+
+        # Create template record with file_path and user_id for multi-tenant
         template = UserTemplate(
             id=template_id,
             name=name,
             file_path=file_path,
-            file_size=file_size
+            file_size=file_size,
+            user_id=get_current_user_id()  # Set user_id for multi-tenant
         )
         db.session.add(template)
         db.session.commit()
@@ -175,9 +180,12 @@ def upload_user_template():
 def list_user_templates():
     """
     GET /api/user-templates - Get list of user templates
+
+    Note: Returns only templates belonging to the authenticated user (multi-tenant)
     """
     try:
-        templates = UserTemplate.query.order_by(UserTemplate.created_at.desc()).all()
+        # Use user-filtered query for multi-tenant isolation
+        templates = user_filtered_query(UserTemplate).order_by(UserTemplate.created_at.desc()).all()
         
         return success_response({
             'templates': [template.to_dict() for template in templates]
@@ -191,10 +199,14 @@ def list_user_templates():
 def delete_user_template(template_id):
     """
     DELETE /api/user-templates/{template_id} - Delete user template
+
+    Note: Only deletes template if it belongs to the authenticated user
     """
     try:
-        template = UserTemplate.query.get(template_id)
-        
+        # Verify template ownership (multi-tenant)
+        user_id = get_current_user_id()
+        template = user_filtered_query(UserTemplate).filter_by(id=template_id).first()
+
         if not template:
             return not_found('UserTemplate')
         

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, LogOut, User } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, ImagePreviewList } from '@/components/shared';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
 import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, uploadMaterial, associateMaterialsToProject } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { isAuthEnabled } from '@/lib/supabase';
 import { PRESET_STYLES } from '@/config/presetStyles';
 
 type CreationType = 'idea' | 'outline' | 'description';
@@ -12,7 +14,9 @@ type CreationType = 'idea' | 'outline' | 'description';
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { initializeProject, isGlobalLoading } = useProjectStore();
+  const { user, signOut } = useAuthStore();
   const { show, ToastContainer } = useToast();
+  const [showUserMenu, setShowUserMenu] = useState(false);
   
   const [activeTab, setActiveTab] = useState<CreationType>('idea');
   const [content, setContent] = useState('');
@@ -514,6 +518,59 @@ export const Home: React.FC = () => {
               <span className="sm:hidden">设</span>
             </Button>
             <Button variant="ghost" size="sm" className="hidden md:inline-flex hover:bg-banana-50/50">帮助</Button>
+
+            {/* 用户菜单 - 仅在认证启用时显示 */}
+            {isAuthEnabled && user && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 p-1.5 rounded-full hover:bg-banana-100/60 transition-colors"
+                  title={user.email || '用户'}
+                >
+                  {user.user_metadata?.avatar_url ? (
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt="用户头像"
+                      className="w-8 h-8 rounded-full border-2 border-banana-300"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-banana-200 flex items-center justify-center">
+                      <User size={16} className="text-banana-700" />
+                    </div>
+                  )}
+                </button>
+
+                {/* 下拉菜单 */}
+                {showUserMenu && (
+                  <>
+                    {/* 点击外部关闭 */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {user.user_metadata?.full_name || user.email}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          signOut();
+                          navigate('/login');
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                      >
+                        <LogOut size={16} />
+                        退出登录
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </nav>

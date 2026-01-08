@@ -4,6 +4,7 @@ Material Controller - handles standalone material image generation
 from flask import Blueprint, request, current_app
 from models import db, Project, Material, Task
 from utils import success_response, error_response, not_found, bad_request
+from utils.tenant import require_project_ownership
 from services import FileService
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, generate_material_image_task

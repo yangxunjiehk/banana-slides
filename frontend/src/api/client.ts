@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase, isAuthEnabled } from '@/lib/supabase';
 
 // 开发环境：通过 Vite proxy 转发
 // 生产环境：通过 nginx proxy 转发
@@ -12,7 +13,19 @@ export const apiClient = axios.create({
 
 // 请求拦截器
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Add Authorization header if auth is enabled
+    if (isAuthEnabled && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          config.headers.Authorization = `Bearer ${session.access_token}`;
+        }
+      } catch (error) {
+        console.error('Failed to get session for auth header:', error);
+      }
+    }
+
     // 如果请求体是 FormData，删除 Content-Type 让浏览器自动设置
     // 浏览器会自动添加正确的 Content-Type 和 boundary
     if (config.data instanceof FormData) {
@@ -24,7 +37,7 @@ apiClient.interceptors.request.use(
       // 对于非 FormData 请求，默认设置为 JSON
       config.headers['Content-Type'] = 'application/json';
     }
-    
+
     return config;
   },
   (error) => {
@@ -38,6 +51,15 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Handle 401 Unauthorized - redirect to login
+    if (error.response?.status === 401 && isAuthEnabled) {
+      console.error('Unauthorized - redirecting to login');
+      // Clear local storage and redirect
+      localStorage.removeItem('currentProjectId');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
     // 统一错误处理
     if (error.response) {
       // 服务器返回错误状态码
