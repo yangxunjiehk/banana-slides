@@ -17,10 +17,11 @@ _project_root = Path(__file__).parent.parent
 _env_file = _project_root / '.env'
 load_dotenv(dotenv_path=_env_file, override=True)
 
-from flask import Flask
+from flask import Flask, request, g
 from flask_cors import CORS
 from models import db
 from config import Config
+from utils.response import error_response
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
@@ -109,6 +110,57 @@ def create_app():
     app.register_blueprint(material_global_bp)
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
+
+    # Register global authentication middleware
+    @app.before_request
+    def authenticate_request():
+        """
+        Global authentication middleware.
+        Reference: MandarinTest's JwtAuthGuard
+
+        Authenticates all /api/* routes when Supabase is configured.
+        """
+        from middleware.auth import is_auth_enabled, verify_token
+
+        # Initialize current_user to None
+        g.current_user = None
+
+        # Skip paths that don't require authentication
+        skip_paths = ['/health', '/', '/api/health', '/api/output-language']
+        if any(request.path == p or request.path.startswith(p + '/') for p in skip_paths):
+            return
+
+        # Skip if authentication is not enabled
+        if not is_auth_enabled():
+            return
+
+        # Only authenticate /api/* routes
+        if not request.path.startswith('/api/'):
+            return
+
+        # Allow OPTIONS requests for CORS preflight
+        if request.method == 'OPTIONS':
+            return
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return error_response('UNAUTHORIZED', 'Missing authorization header', 401)
+
+        try:
+            parts = auth_header.split()
+            if len(parts) != 2:
+                raise ValueError("Invalid format")
+            scheme, token = parts
+            if scheme.lower() != 'bearer':
+                raise ValueError("Invalid scheme")
+        except ValueError:
+            return error_response('UNAUTHORIZED', 'Invalid authorization header format', 401)
+
+        user, err = verify_token(token)
+        if err:
+            return error_response('UNAUTHORIZED', err, 401)
+
+        g.current_user = user
 
     with app.app_context():
         # Load settings from database and sync to app.config

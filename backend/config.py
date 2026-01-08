@@ -106,6 +106,12 @@ class Config:
     BAIDU_OCR_API_KEY = os.getenv('BAIDU_OCR_API_KEY', '')
     BAIDU_OCR_API_SECRET = os.getenv('BAIDU_OCR_API_SECRET', '')
 
+    # Supabase Authentication (可选，不配置则禁用认证)
+    SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+    SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+    SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
+    SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET', '')
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""
