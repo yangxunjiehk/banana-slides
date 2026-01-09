@@ -8,6 +8,12 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { apiClient } from '@/api/client';
 
+interface VerifyResponse {
+  authorized: boolean;
+  email?: string;
+  is_admin?: boolean;
+}
+
 export function AuthCallback() {
   const navigate = useNavigate();
   const { isAuthenticated, isInitialized } = useAuthStore();
@@ -35,9 +41,13 @@ export function AuthCallback() {
           // Session obtained, now verify whitelist before proceeding
           setVerifying(true);
           try {
-            await apiClient.get('/api/auth/verify');
+            const response = await apiClient.get<VerifyResponse>('/api/auth/verify');
             // User is in whitelist, allow access
             setVerified(true);
+            // Set admin status from verify response
+            if (response.data?.is_admin !== undefined) {
+              useAuthStore.setState({ isAdmin: response.data.is_admin });
+            }
           } catch (verifyError: any) {
             if (verifyError.response?.status === 403) {
               // User not in whitelist - sign out and redirect to login

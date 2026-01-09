@@ -25,6 +25,7 @@ from .page_image_version import PageImageVersion
 from .material import Material
 from .reference_file import ReferenceFile
 from .settings import Settings
+from .allowed_email import AllowedEmail
 
-__all__ = ['db', 'User', 'Project', 'Page', 'Task', 'UserTemplate', 'PageImageVersion', 'Material', 'ReferenceFile', 'Settings']
+__all__ = ['db', 'User', 'Project', 'Page', 'Task', 'UserTemplate', 'PageImageVersion', 'Material', 'ReferenceFile', 'Settings', 'AllowedEmail']
 

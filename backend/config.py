@@ -112,7 +112,12 @@ class Config:
     SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET', '')
 
-    # 邮箱白名单 (可选，不配置则允许所有已登录用户访问)
+    # 管理员邮箱列表 (可管理白名单的用户)
+    # 格式: 逗号分隔的邮箱列表，如 "admin@gmail.com"
+    _admin_emails_raw = os.getenv('ADMIN_EMAILS', '')
+    ADMIN_EMAILS = [e.strip().lower() for e in _admin_emails_raw.split(',') if e.strip()] if _admin_emails_raw else []
+
+    # 邮箱白名单 (可选，用于初始化数据库，之后通过管理界面管理)
     # 格式: 逗号分隔的邮箱列表，如 "user1@gmail.com,user2@gmail.com"
     _allowed_emails_raw = os.getenv('ALLOWED_EMAILS', '')
     ALLOWED_EMAILS = [e.strip().lower() for e in _allowed_emails_raw.split(',') if e.strip()] if _allowed_emails_raw else []

@@ -12,12 +12,14 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialized: boolean;
+  isAdmin: boolean;
 
   initialize: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   clearAuth: () => void;
+  checkAdminStatus: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -26,6 +28,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   isInitialized: false,
+  isAdmin: false,
 
   initialize: async () => {
     // If auth is not enabled, mark as authenticated (no login required)
@@ -53,6 +56,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isInitialized: true,
         isLoading: false,
       });
+
+      // Check admin status if user is authenticated
+      if (session?.user) {
+        // Use setTimeout to avoid blocking initialization
+        setTimeout(async () => {
+          try {
+            const { checkAdminStatus: checkAdmin } = await import('@/api/endpoints');
+            const response = await checkAdmin();
+            if (response.success && response.data) {
+              set({ isAdmin: response.data.is_admin });
+            }
+          } catch (error) {
+            console.error('Failed to check admin status during init:', error);
+          }
+        }, 100);
+      }
 
       // Listen for auth state changes
       supabase.auth.onAuthStateChange((_event, session) => {
@@ -145,7 +164,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       session: null,
       isAuthenticated: false,
+      isAdmin: false,
       isInitialized: true,
     });
+  },
+
+  checkAdminStatus: async () => {
+    try {
+      const { checkAdminStatus: checkAdmin } = await import('@/api/endpoints');
+      const response = await checkAdmin();
+      if (response.success && response.data) {
+        set({ isAdmin: response.data.is_admin });
+      }
+    } catch (error) {
+      console.error('Failed to check admin status:', error);
+      set({ isAdmin: false });
+    }
   },
 }));

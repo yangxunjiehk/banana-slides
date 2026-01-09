@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, LogOut, User } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, LogOut, User, Shield } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, ImagePreviewList } from '@/components/shared';
+import { WhitelistManager } from '@/components/shared/WhitelistManager';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
 import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, uploadMaterial, associateMaterialsToProject } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
@@ -14,9 +16,10 @@ type CreationType = 'idea' | 'outline' | 'description';
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { initializeProject, isGlobalLoading } = useProjectStore();
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, isAdmin, checkAdminStatus } = useAuthStore();
   const { show, ToastContainer } = useToast();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showWhitelistManager, setShowWhitelistManager] = useState(false);
   
   const [activeTab, setActiveTab] = useState<CreationType>('idea');
   const [content, setContent] = useState('');
@@ -33,14 +36,16 @@ export const Home: React.FC = () => {
   const [useTemplateStyle, setUseTemplateStyle] = useState(false);
   const [templateStyle, setTemplateStyle] = useState('');
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   // 检查是否有当前项目 & 加载用户模板
   useEffect(() => {
     const projectId = localStorage.getItem('currentProjectId');
     setCurrentProjectId(projectId);
-    
+
     // 加载用户模板列表（用于按需获取File）
     const loadTemplates = async () => {
       try {
@@ -54,6 +59,25 @@ export const Home: React.FC = () => {
     };
     loadTemplates();
   }, []);
+
+  // 检查用户管理员状态（仅在 isAdmin 未设置时检查）
+  useEffect(() => {
+    if (isAuthEnabled && user && !isAdmin) {
+      checkAdminStatus();
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 处理用户菜单打开，计算位置
+  const handleUserMenuToggle = useCallback(() => {
+    if (!showUserMenu && userMenuButtonRef.current) {
+      const rect = userMenuButtonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 8, // 按钮底部 + 间距
+        right: window.innerWidth - rect.right, // 右对齐
+      });
+    }
+    setShowUserMenu(!showUserMenu);
+  }, [showUserMenu]);
 
   const handleOpenMaterialModal = () => {
     // 在主页始终生成全局素材，不关联任何项目
@@ -521,9 +545,10 @@ export const Home: React.FC = () => {
 
             {/* 用户菜单 - 仅在认证启用时显示 */}
             {isAuthEnabled && user && (
-              <div className="relative">
+              <>
                 <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  ref={userMenuButtonRef}
+                  onClick={handleUserMenuToggle}
                   className="flex items-center gap-2 p-1.5 rounded-full hover:bg-banana-100/60 transition-colors"
                   title={user.email || '用户'}
                 >
@@ -540,21 +565,49 @@ export const Home: React.FC = () => {
                   )}
                 </button>
 
-                {/* 下拉菜单 */}
-                {showUserMenu && (
+                {/* 使用 Portal 将下拉菜单渲染到 body */}
+                {showUserMenu && createPortal(
                   <>
-                    {/* 点击外部关闭 */}
+                    {/* 点击外部关闭的遮罩层 */}
                     <div
-                      className="fixed inset-0 z-40"
+                      className="fixed inset-0"
+                      style={{ zIndex: 9998 }}
                       onClick={() => setShowUserMenu(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    {/* 下拉菜单 */}
+                    <div
+                      className="fixed w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2"
+                      style={{
+                        zIndex: 9999,
+                        top: menuPosition.top,
+                        right: menuPosition.right,
+                      }}
+                    >
                       <div className="px-4 py-2 border-b border-gray-100">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {user.user_metadata?.full_name || user.email}
                         </p>
                         <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        {isAdmin && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                            <Shield size={10} />
+                            Admin
+                          </span>
+                        )}
                       </div>
+                      {/* 管理员白名单管理按钮 */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setShowWhitelistManager(true);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                        >
+                          <Shield size={16} />
+                          <span>Whitelist</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setShowUserMenu(false);
@@ -564,12 +617,13 @@ export const Home: React.FC = () => {
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                       >
                         <LogOut size={16} />
-                        退出登录
+                        <span>退出登录</span>
                       </button>
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -848,6 +902,11 @@ export const Home: React.FC = () => {
       />
       
       <FilePreviewModal fileId={previewFileId} onClose={() => setPreviewFileId(null)} />
+      {/* 白名单管理模态框（仅管理员） */}
+      <WhitelistManager
+        isOpen={showWhitelistManager}
+        onClose={() => setShowWhitelistManager(false)}
+      />
     </div>
   );
 };

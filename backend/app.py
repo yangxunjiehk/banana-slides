@@ -25,6 +25,7 @@ from utils.response import error_response
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
+from controllers.whitelist_controller import whitelist_bp
 from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp
 
 
@@ -110,6 +111,7 @@ def create_app():
     app.register_blueprint(material_global_bp)
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
+    app.register_blueprint(whitelist_bp)
 
     # Register global authentication middleware
     @app.before_request
@@ -160,11 +162,14 @@ def create_app():
         if err:
             return error_response('UNAUTHORIZED', err, 401)
 
-        # Check email whitelist (if configured)
-        allowed_emails = app.config.get('ALLOWED_EMAILS', [])
-        if allowed_emails:
-            user_email = (user.get('email') or '').lower()
-            if user_email not in allowed_emails:
+        # Check email whitelist (from database)
+        from models import AllowedEmail
+        user_email = (user.get('email') or '').lower()
+
+        # Check if whitelist has any entries (if empty, allow all authenticated users)
+        whitelist_count = AllowedEmail.query.count()
+        if whitelist_count > 0:
+            if not AllowedEmail.is_email_allowed(user_email):
                 logging.warning(f"Access denied for email: {user_email} (not in whitelist)")
                 return error_response('FORBIDDEN', 'Your account is not authorized to access this service', 403)
 
@@ -173,6 +178,13 @@ def create_app():
     with app.app_context():
         # Load settings from database and sync to app.config
         _load_settings_to_config(app)
+
+        # Initialize whitelist from environment variable (first-time setup only)
+        from models import AllowedEmail
+        try:
+            AllowedEmail.init_from_env()
+        except Exception as e:
+            logging.warning(f"Could not initialize whitelist from env: {e}")
 
     # Health check endpoint
     @app.route('/health')
@@ -208,14 +220,20 @@ def create_app():
         if err:
             return error_response('UNAUTHORIZED', err, 401)
 
-        # Check email whitelist
-        allowed_emails = app.config.get('ALLOWED_EMAILS', [])
-        if allowed_emails:
-            user_email = (user.get('email') or '').lower()
-            if user_email not in allowed_emails:
+        # Check email whitelist (from database)
+        from models import AllowedEmail
+        user_email = (user.get('email') or '').lower()
+
+        # Check if whitelist has any entries (if empty, allow all authenticated users)
+        whitelist_count = AllowedEmail.query.count()
+        if whitelist_count > 0:
+            if not AllowedEmail.is_email_allowed(user_email):
                 return error_response('FORBIDDEN', 'Your account is not authorized to access this service', 403)
 
-        return {'authorized': True, 'email': user.get('email')}
+        # Check if user is admin
+        is_admin = user_email in Config.ADMIN_EMAILS
+
+        return {'authorized': True, 'email': user.get('email'), 'is_admin': is_admin}
     
     # Output language endpoint
     @app.route('/api/output-language', methods=['GET'])

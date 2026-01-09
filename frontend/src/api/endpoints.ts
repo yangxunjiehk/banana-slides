@@ -829,3 +829,44 @@ export const resetSettings = async (): Promise<ApiResponse<Settings>> => {
   const response = await apiClient.post<ApiResponse<Settings>>('/api/settings/reset');
   return response.data;
 };
+
+// ===== 白名单管理 API (Admin Only) =====
+
+export interface AllowedEmail {
+  id: number;
+  email: string;
+  added_by: string | null;
+  created_at: string;
+}
+
+/**
+ * 检查当前用户是否为管理员
+ */
+export const checkAdminStatus = async (): Promise<ApiResponse<{ is_admin: boolean }>> => {
+  const response = await apiClient.get<ApiResponse<{ is_admin: boolean }>>('/api/whitelist/check-admin');
+  return response.data;
+};
+
+/**
+ * 获取白名单列表（仅管理员）
+ */
+export const getWhitelist = async (): Promise<ApiResponse<{ emails: AllowedEmail[]; is_admin: boolean }>> => {
+  const response = await apiClient.get<ApiResponse<{ emails: AllowedEmail[]; is_admin: boolean }>>('/api/whitelist');
+  return response.data;
+};
+
+/**
+ * 添加邮箱到白名单（仅管理员）
+ */
+export const addToWhitelist = async (email: string): Promise<ApiResponse<AllowedEmail>> => {
+  const response = await apiClient.post<ApiResponse<AllowedEmail>>('/api/whitelist', { email });
+  return response.data;
+};
+
+/**
+ * 从白名单删除邮箱（仅管理员）
+ */
+export const removeFromWhitelist = async (email: string): Promise<ApiResponse<void>> => {
+  const response = await apiClient.delete<ApiResponse<void>>(`/api/whitelist/${encodeURIComponent(email)}`);
+  return response.data;
+};
