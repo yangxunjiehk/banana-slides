@@ -15,6 +15,7 @@ interface AuthState {
 
   initialize: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   clearAuth: () => void;
 }
@@ -90,6 +91,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Sign in error:', error);
       set({ isLoading: false });
+    }
+  },
+
+  signInWithMagicLink: async (email: string) => {
+    if (!supabase) return { success: false, error: 'Auth not configured' };
+
+    set({ isLoading: true });
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      set({ isLoading: false });
+
+      if (error) {
+        console.error('Magic link error:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Magic link error:', error);
+      set({ isLoading: false });
+      return { success: false, error: error.message || 'Failed to send magic link' };
     }
   },
 

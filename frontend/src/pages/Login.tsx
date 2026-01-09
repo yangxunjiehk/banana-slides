@@ -1,5 +1,5 @@
 /**
- * Login page with Google OAuth
+ * Login page with Google OAuth and Magic Link
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -10,12 +10,17 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, isInitialized, isLoading, signInWithGoogle } =
+  const { isAuthenticated, isInitialized, isLoading, signInWithGoogle, signInWithMagicLink } =
     useAuthStore();
 
   // Check for error in URL params
   const errorType = searchParams.get('error');
   const [showError, setShowError] = useState(!!errorType);
+
+  // Magic Link state
+  const [email, setEmail] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkError, setMagicLinkError] = useState('');
 
   // Redirect to home if already authenticated
   useEffect(() => {
@@ -36,10 +41,59 @@ export function Login() {
     await signInWithGoogle();
   };
 
+  const handleMagicLinkLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMagicLinkError('');
+
+    if (!email.trim()) {
+      setMagicLinkError('Please enter your email address');
+      return;
+    }
+
+    const result = await signInWithMagicLink(email.trim());
+
+    if (result.success) {
+      setMagicLinkSent(true);
+    } else {
+      setMagicLinkError(result.error || 'Failed to send magic link');
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-yellow-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Show success message after magic link is sent
+  if (magicLinkSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Check your email</h2>
+          <p className="text-gray-600 mb-4">
+            We've sent a magic link to <span className="font-medium">{email}</span>
+          </p>
+          <p className="text-gray-500 text-sm mb-6">
+            Click the link in the email to sign in. The link will expire in 1 hour.
+          </p>
+          <button
+            onClick={() => {
+              setMagicLinkSent(false);
+              setEmail('');
+            }}
+            className="text-yellow-600 hover:text-yellow-700 font-medium"
+          >
+            Use a different email
+          </button>
+        </div>
       </div>
     );
   }
@@ -80,6 +134,44 @@ export function Login() {
         )}
 
         <div className="space-y-4">
+          {/* Magic Link Form */}
+          <form onSubmit={handleMagicLinkLogin} className="space-y-3">
+            <div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all"
+                disabled={isLoading}
+              />
+              {magicLinkError && (
+                <p className="text-red-500 text-sm mt-1">{magicLinkError}</p>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {isLoading ? 'Sending...' : 'Send Magic Link'}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">or continue with</span>
+            </div>
+          </div>
+
+          {/* Google Login */}
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
@@ -104,7 +196,7 @@ export function Login() {
               />
             </svg>
             <span className="text-gray-700 font-medium">
-              {isLoading ? 'Loading...' : 'Continue with Google'}
+              {isLoading ? 'Loading...' : 'Google'}
             </span>
           </button>
         </div>
