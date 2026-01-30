@@ -1,7 +1,7 @@
 """add enable_reasoning to settings
 
 Revision ID: 007_add_enable_reasoning
-Revises: 006_add_export_settings
+Revises: 008_allowed_emails
 Create Date: 2025-01-17 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = '007_add_enable_reasoning'
-down_revision = '006_add_export_settings'
+down_revision = '008_allowed_emails'
 branch_labels = None
 depends_on = None
 
