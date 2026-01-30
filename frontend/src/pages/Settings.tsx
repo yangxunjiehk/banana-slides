@@ -102,7 +102,7 @@ const settingsSections: SectionConfig[] = [
         key: 'text_model',
         label: '文本大模型',
         type: 'text',
-        placeholder: '留空使用环境变量配置 (如: gemini-2.0-flash-exp)',
+        placeholder: '留空使用环境变量配置 (如: gemini-3-flash-preview)',
         description: '用于生成大纲、描述等文本内容的模型名称',
       },
       {
@@ -116,7 +116,7 @@ const settingsSections: SectionConfig[] = [
         key: 'image_caption_model',
         label: '图片识别模型',
         type: 'text',
-        placeholder: '留空使用环境变量配置 (如: gemini-2.0-flash-exp)',
+        placeholder: '留空使用环境变量配置 (如: gemini-3-flash-preview)',
         description: '用于识别参考文件中的图片并生成描述',
       },
     ],
@@ -403,16 +403,80 @@ export const Settings: React.FC = () => {
 
   const handleServiceTest = async (
     key: string,
-    action: () => Promise<any>,
+    action: (settings?: any) => Promise<any>,
     formatDetail: (data: any) => string
   ) => {
     updateServiceTest(key, { status: 'loading' });
     try {
-      const response = await action();
-      const detail = formatDetail(response.data);
-      const message = response.message || '测试成功';
-      updateServiceTest(key, { status: 'success', message, detail });
-      show({ message, type: 'success' });
+      // 准备测试时要使用的设置（包括未保存的修改）
+      const testSettings: any = {};
+
+      // 只传递用户已填写的非空值
+      if (formData.api_key) testSettings.api_key = formData.api_key;
+      if (formData.api_base_url) testSettings.api_base_url = formData.api_base_url;
+      if (formData.ai_provider_format) testSettings.ai_provider_format = formData.ai_provider_format;
+      if (formData.text_model) testSettings.text_model = formData.text_model;
+      if (formData.image_model) testSettings.image_model = formData.image_model;
+      if (formData.image_caption_model) testSettings.image_caption_model = formData.image_caption_model;
+      if (formData.mineru_api_base) testSettings.mineru_api_base = formData.mineru_api_base;
+      if (formData.mineru_token) testSettings.mineru_token = formData.mineru_token;
+      if (formData.baidu_ocr_api_key) testSettings.baidu_ocr_api_key = formData.baidu_ocr_api_key;
+      if (formData.image_resolution) testSettings.image_resolution = formData.image_resolution;
+
+      // 推理模式设置
+      if (formData.enable_text_reasoning !== undefined) {
+        testSettings.enable_text_reasoning = formData.enable_text_reasoning;
+      }
+      if (formData.text_thinking_budget !== undefined) {
+        testSettings.text_thinking_budget = formData.text_thinking_budget;
+      }
+      if (formData.enable_image_reasoning !== undefined) {
+        testSettings.enable_image_reasoning = formData.enable_image_reasoning;
+      }
+      if (formData.image_thinking_budget !== undefined) {
+        testSettings.image_thinking_budget = formData.image_thinking_budget;
+      }
+
+      // 启动异步测试，获取任务ID
+      const response = await action(testSettings);
+      const taskId = response.data.task_id;
+
+      // 开始轮询任务状态
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.getTestStatus(taskId);
+          const taskStatus = statusResponse.data.status;
+
+          if (taskStatus === 'COMPLETED') {
+            clearInterval(pollInterval);
+            const detail = formatDetail(statusResponse.data.result || {});
+            const message = statusResponse.data.message || '测试成功';
+            updateServiceTest(key, { status: 'success', message, detail });
+            show({ message, type: 'success' });
+          } else if (taskStatus === 'FAILED') {
+            clearInterval(pollInterval);
+            const errorMessage = statusResponse.data.error || '测试失败';
+            updateServiceTest(key, { status: 'error', message: errorMessage });
+            show({ message: '测试失败: ' + errorMessage, type: 'error' });
+          }
+          // 如果是 PENDING 或 PROCESSING，继续轮询
+        } catch (pollError: any) {
+          clearInterval(pollInterval);
+          const errorMessage = pollError?.response?.data?.error?.message || pollError?.message || '轮询失败';
+          updateServiceTest(key, { status: 'error', message: errorMessage });
+          show({ message: '测试失败: ' + errorMessage, type: 'error' });
+        }
+      }, 2000); // 每2秒轮询一次
+
+      // 设置最大轮询时间（2分钟）
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (serviceTestStates[key]?.status === 'loading') {
+          updateServiceTest(key, { status: 'error', message: '测试超时' });
+          show({ message: '测试超时，请重试', type: 'error' });
+        }
+      }, 120000);
+
     } catch (error: any) {
       const errorMessage = error?.response?.data?.error?.message || error?.message || '未知错误';
       updateServiceTest(key, { status: 'error', message: errorMessage });
@@ -598,6 +662,11 @@ export const Settings: React.FC = () => {
           <p className="text-sm text-gray-500">
             提前验证关键服务配置是否可用，避免使用期间异常。
           </p>
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-gray-700">
+              💡 提示：图像生成和 MinerU 测试可能需要 30-60 秒，请耐心等待。
+            </p>
+          </div>
           <div className="space-y-4">
             {[
               {
@@ -631,16 +700,16 @@ export const Settings: React.FC = () => {
               {
                 key: 'image-model',
                 title: '图像生成模型',
-                description: '基于测试图片生成演示文稿背景图',
+                description: '基于测试图片生成演示文稿背景图（1K, 可能需要 20-40 秒）',
                 action: api.testImageModel,
                 formatDetail: (data: any) => (data?.image_size ? `输出尺寸：${data.image_size[0]}x${data.image_size[1]}` : ''),
               },
               {
                 key: 'mineru-pdf',
                 title: 'MinerU 解析 PDF',
-                description: '上传测试 PDF 并等待解析结果返回',
+                description: '上传测试 PDF 并等待解析结果返回（可能需要 30-60 秒）',
                 action: api.testMineruPdf,
-                formatDetail: (data: any) => (data?.content_preview ? `解析预览：${data.content_preview}` : ''),
+                formatDetail: (data: any) => (data?.content_preview ? `解析预览：${data.content_preview}` : data?.message || ''),
               },
             ].map((item) => {
               const testState = serviceTestStates[item.key] || { status: 'idle' as TestStatus };
