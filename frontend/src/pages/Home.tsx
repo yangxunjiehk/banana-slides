@@ -874,20 +874,74 @@ export const Home: React.FC = () => {
             {/* 根据模式显示不同的内容 */}
             {useTemplateStyle ? (
               <div className="space-y-3">
-                <Textarea
-                  placeholder="描述您想要的 PPT 风格，例如：简约商务风格，使用蓝色和白色配色，字体清晰大方..."
-                  value={templateStyle}
-                  onChange={(e) => setTemplateStyle(e.target.value)}
-                  rows={3}
-                  className="text-sm border-2 border-gray-200 focus:border-banana-400 transition-colors duration-200"
-                />
-                
+                {/* 当选择 AI 随机风格时显示特殊提示 */}
+                {templateStyle === '[AI_GENERATE_STYLE]' ? (
+                  <div className="p-4 rounded-lg border-2 border-dashed border-purple-300 bg-purple-50">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🎲</span>
+                      <div>
+                        <p className="text-sm font-medium text-purple-700">AI 随机风格已选择</p>
+                        <p className="text-xs text-purple-600 mt-1">
+                          生成图片时，AI 将根据 PPT 内容自动设计独特的视觉风格
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Textarea
+                    placeholder="描述您想要的 PPT 风格，例如：简约商务风格，使用蓝色和白色配色，字体清晰大方..."
+                    value={templateStyle}
+                    onChange={(e) => setTemplateStyle(e.target.value)}
+                    rows={3}
+                    className="text-sm border-2 border-gray-200 focus:border-banana-400 transition-colors duration-200"
+                  />
+                )}
+
                 {/* 预设风格按钮 */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-gray-600">
                     快速选择预设风格：
                   </p>
                   <div className="flex flex-wrap gap-2">
+                    {/* AI 随机风格按钮 */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTemplateStyle('[AI_GENERATE_STYLE]')}
+                        onMouseEnter={() => setHoveredPresetId('ai-random')}
+                        onMouseLeave={() => setHoveredPresetId(null)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full border-2 transition-all duration-200 hover:shadow-sm ${
+                          templateStyle === '[AI_GENERATE_STYLE]'
+                            ? 'border-purple-500 bg-purple-50 text-purple-700'
+                            : 'border-purple-200 hover:border-purple-400 hover:bg-purple-50 text-purple-600'
+                        }`}
+                      >
+                        AI 随机风格
+                      </button>
+
+                      {/* 悬停时显示说明 */}
+                      {hoveredPresetId === 'ai-random' && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                          <div className="bg-white rounded-lg shadow-2xl border-2 border-purple-400 p-3 w-64">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-lg">🎲</span>
+                              <span className="text-sm font-medium text-purple-700">AI 随机风格</span>
+                            </div>
+                            <p className="text-xs text-gray-600">
+                              让 AI 根据您的 PPT 内容，自动设计一套独特的视觉风格。AI 会考虑主题特点，生成配色、材质、排版等完整的风格方案。
+                            </p>
+                          </div>
+                          {/* 小三角形指示器 */}
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                            <div className="w-3 h-3 bg-white border-r-2 border-b-2 border-purple-400 transform rotate-45"></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 分隔线 */}
+                    <div className="w-px h-6 bg-gray-300 self-center mx-1"></div>
+
                     {PRESET_STYLES.map((preset) => (
                       <div key={preset.id} className="relative">
                         <button
@@ -899,7 +953,7 @@ export const Home: React.FC = () => {
                         >
                           {preset.name}
                         </button>
-                        
+
                         {/* 悬停时显示预览图片 */}
                         {hoveredPresetId === preset.id && preset.previewImage && (
                           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -929,7 +983,7 @@ export const Home: React.FC = () => {
                 </div>
                 
                 <p className="text-xs text-gray-500">
-                  💡 提示：点击预设风格快速填充，或自定义描述风格、配色、布局等要求
+                  💡 提示：选择「AI 随机风格」让 AI 自动设计，或点击预设风格快速填充，也可以自定义描述
                 </p>
               </div>
             ) : (

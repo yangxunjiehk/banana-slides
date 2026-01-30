@@ -927,3 +927,65 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 # {regions_info}
 # """
     return prompt
+
+
+def get_random_style_generation_prompt(ppt_topic: str = None, language: str = None) -> str:
+    """
+    生成 AI 随机风格提示词的 prompt
+
+    Args:
+        ppt_topic: PPT 的主题或内容概述（可选）
+        language: 输出语言
+
+    Returns:
+        格式化后的 prompt 字符串
+    """
+    lang_instruction = get_language_instruction(language)
+
+    topic_context = ""
+    if ppt_topic and ppt_topic.strip():
+        topic_context = f"""
+PPT 的主题/内容概述：
+{ppt_topic}
+
+请根据上述主题，选择一个最合适且能增强内容表达的视觉风格。
+"""
+    else:
+        topic_context = """
+请随机选择一个独特且富有创意的视觉风格。
+"""
+
+    prompt = f"""\
+你是一位资深的 UI/UX 设计师和视觉艺术总监，拥有丰富的 PPT 演示设计经验。
+
+{topic_context}
+
+请为这个 PPT 设计一套完整的视觉风格描述，这个描述将用于指导 AI 图像生成模型为每一页 PPT 生成统一风格的图片。
+
+你的风格描述必须包含以下四个部分，每部分都要详细具体：
+
+1. **视觉描述**：整体美学定位、参考的设计流派或品牌风格、光照环境、整体氛围
+
+2. **配色与材质**：
+   - 明确的背景色（包含色值，如 #XXXXXX）
+   - 前景色和强调色（包含色值）
+   - 材质质感描述（如：哑光、磨砂玻璃、金属光泽、纸张纹理等）
+
+3. **内容与排版**：
+   - 排版布局原则（网格系统、对齐方式、留白比例）
+   - 字体风格建议（衬线/无衬线、粗细、风格）
+   - 装饰元素（几何图形、插画风格、图标等）
+
+4. **渲染要求**：最终输出的视觉效果要求（如：矢量插画风格、3D 渲染、摄影风格等）
+
+要求：
+- 风格要独特有创意，避免过于普通或平庸
+- 描述要足够详细，让 AI 能够准确理解并执行
+- 确保风格适合多页 PPT 的统一应用
+- 输出的风格描述应该是连贯的段落文本，不要使用 markdown 标题格式
+
+{lang_instruction}
+
+请直接输出风格描述文本，不要添加任何前言或解释。
+"""
+    return prompt

@@ -708,15 +708,34 @@ def generate_images(project_id):
         
         if not ref_image_path and not project.template_style:
             return bad_request("请先上传模板图片或添加风格描述。")
-        
+
         # Reconstruct outline from pages with part structure
         outline = _reconstruct_outline_from_pages(pages)
-        
+
         # 从配置中读取默认并发数，如果请求中提供了则使用请求的值
         max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 8))
         use_template = data.get('use_template', True)
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
-        
+
+        # Get singleton AI service instance
+        ai_service = get_ai_service()
+
+        # 检查是否需要 AI 生成随机风格
+        AI_RANDOM_STYLE_MARKER = "[AI_GENERATE_STYLE]"
+        if project.template_style and project.template_style.strip() == AI_RANDOM_STYLE_MARKER:
+            logger.info(f"Detected AI random style marker for project {project_id}, generating style...")
+            # 获取 PPT 主题信息用于生成更合适的风格
+            ppt_topic = project.idea_prompt or project.description_text or project.outline_text or ""
+            try:
+                generated_style = ai_service.generate_random_style(ppt_topic=ppt_topic, language=language)
+                # 更新项目的风格描述
+                project.template_style = generated_style
+                db.session.commit()
+                logger.info(f"Generated and saved random style for project {project_id}")
+            except Exception as e:
+                logger.error(f"Failed to generate random style: {str(e)}")
+                return error_response('STYLE_GENERATION_FAILED', f"AI 风格生成失败: {str(e)}", 500)
+
         # Create task
         task = Task(
             project_id=project_id,
@@ -728,13 +747,10 @@ def generate_images(project_id):
             'completed': 0,
             'failed': 0
         })
-        
+
         db.session.add(task)
         db.session.commit()
-        
-        # Get singleton AI service instance
-        ai_service = get_ai_service()
-        
+
         # 合并额外要求和风格描述
         combined_requirements = project.extra_requirements or ""
         if project.template_style:

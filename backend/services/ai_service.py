@@ -21,7 +21,8 @@ from .prompts import (
     get_description_to_outline_prompt,
     get_description_split_prompt,
     get_outline_refinement_prompt,
-    get_descriptions_refinement_prompt
+    get_descriptions_refinement_prompt,
+    get_random_style_generation_prompt
 )
 from .ai_providers import get_text_provider, get_image_provider, TextProvider, ImageProvider
 from config import get_config
@@ -304,17 +305,41 @@ class AIService:
         """
         Generate PPT outline from idea prompt
         Based on demo.py gen_outline()
-        
+
         Args:
             project_context: 项目上下文对象，包含所有原始信息
-            
+
         Returns:
             List of outline items (may contain parts with pages or direct pages)
         """
         outline_prompt = get_outline_generation_prompt(project_context, language)
         outline = self.generate_json(outline_prompt, thinking_budget=1000)
         return outline
-    
+
+    def generate_random_style(self, ppt_topic: str = None, language: str = None) -> str:
+        """
+        Generate a random PPT visual style description using AI
+
+        Args:
+            ppt_topic: Optional PPT topic/content overview for context-aware style generation
+            language: Output language
+
+        Returns:
+            A detailed style description string that can be used as template_style
+        """
+        style_prompt = get_random_style_generation_prompt(ppt_topic, language)
+        actual_budget = self._get_text_thinking_budget()
+        response_text = self.text_provider.generate_text(style_prompt, thinking_budget=actual_budget)
+
+        # Clean up the response
+        cleaned_text = response_text.strip()
+        # Remove any markdown formatting if present
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text.strip("```").strip()
+
+        logger.info(f"Generated random style description ({len(cleaned_text)} chars)")
+        return cleaned_text
+
     def parse_outline_text(self, project_context: ProjectContext, language: str = None) -> List[Dict]:
         """
         Parse user-provided outline text into structured outline format
