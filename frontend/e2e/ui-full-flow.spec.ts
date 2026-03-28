@@ -28,8 +28,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 test.describe('UI-driven E2E test: From user interface to PPT export', () => {
-  // Increase timeout to 20 minutes
-  test.setTimeout(20 * 60 * 1000)
+  // Increase timeout to 25 minutes (image generation may need retries on API disconnects)
+  test.setTimeout(25 * 60 * 1000)
   
   test('User Full Flow: Create and export PPT in browser', async ({ page }) => {
     console.log('\n========================================')
@@ -40,8 +40,13 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
     // Step 1: Visit homepage
     // ====================================
     console.log('📱 Step 1: Opening homepage...')
+
+    // Prevent HelpModal from appearing (it opens with a 500ms delay on first visit)
+    await page.addInitScript(() => {
+      localStorage.setItem('hasSeenHelpModal', 'true')
+    })
     await page.goto('http://localhost:3000')
-    
+
     // Verify page loaded
     await expect(page).toHaveTitle(/蕉幻|Banana/i)
     console.log('✓ Homepage loaded successfully\n')
@@ -55,16 +60,17 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
       // If click fails, the tab might already be selected, which is fine
     })
     
-    // Wait for form to appear
-    await page.waitForSelector('textarea, input[type="text"]', { timeout: 10000 })
+    // Wait for form to appear (MarkdownTextarea uses contentEditable div with role="textbox")
+    await page.waitForSelector('[role="textbox"], textarea, input[type="text"]', { timeout: 10000 })
     console.log('✓ Create form displayed\n')
-    
+
     // ====================================
     // Step 3: Enter idea and click "Next"
     // ====================================
     console.log('✍️  Step 3: Entering idea content...')
-    const ideaInput = page.locator('textarea, input[type="text"]').first()
-    await ideaInput.fill('创建一份关于人工智能基础的简短PPT，包含3页：什么是AI、AI的应用、AI的未来')
+    const ideaInput = page.locator('[role="textbox"], textarea, input[type="text"]').first()
+    await ideaInput.click()
+    await ideaInput.pressSequentially('创建一份关于人工智能基础的简短PPT，包含3页：什么是AI、AI的应用、AI的未来')
     
     console.log('🚀 Clicking "Next" button...')
     await page.click('button:has-text("下一步")')
@@ -87,19 +93,22 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
     // ====================================
     // Step 5: Wait for outline generation to complete (smart wait)
     // ====================================
-    console.log('⏳ Step 5: Waiting for outline generation (may take 1-2 minutes)...')
-    
-    // Smart wait: Use expect().toPass() for retry polling
-    // Look for cards with "第 X 页" text - this is the most reliable indicator
-    await expect(async () => {
-      // Use text pattern matching for "第 X 页" which appears in each outline card
-      const outlineItems = page.locator('text=/第 \\d+ 页/')
-      const count = await outlineItems.count()
-      if (count === 0) {
-        throw new Error('Outline items not yet visible')
-      }
-      expect(count).toBeGreaterThan(0)
-    }).toPass({ timeout: 120000, intervals: [2000, 5000, 10000] })
+    console.log('⏳ Step 5: Waiting for outline generation (may take 3-5 minutes)...')
+
+    // Outline generation uses SSE streaming: the button shows "生成中..." and
+    // pages appear incrementally. Wait for the first card, then for streaming
+    // to finish (button text reverts from "生成中...").
+    const streamingBtn = page.locator('button:has-text("生成中...")')
+    await streamingBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+      console.log('  Streaming button state not detected, generation may have completed quickly')
+    })
+
+    // Wait for at least one outline card (pages stream in one by one)
+    await expect(page.locator('text=/第 \\d+ 页/').first()).toBeVisible({ timeout: 300000 })
+    console.log('  First outline card appeared')
+
+    // Wait for streaming to finish (button reverts from "生成中...")
+    await expect(streamingBtn).toBeHidden({ timeout: 300000 })
     
     // Verify outline content
     const outlineItems = page.locator('text=/第 \\d+ 页/')
@@ -141,17 +150,14 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
     // ====================================
     console.log('⏳ Step 8: Waiting for descriptions to generate (may take 2-5 minutes)...')
     
-    // Smart wait: Use expect().toPass() for retry polling
+    // Smart wait: The "生成图片" button is disabled until ALL pages have description_content.
+    // Wait for it to become enabled as the definitive signal that all descriptions are done.
+    const generateImagesBtnForWait = page.locator('button:has-text("生成图片")').first()
     await expect(async () => {
-      const completedIndicators = page.locator('[data-status="descriptions-generated"], .description-complete, button:has-text("重新生成"):not([disabled])')
-      const count = await completedIndicators.count()
-      if (count === 0) {
-        throw new Error('Descriptions not yet generated')
-      }
-      expect(count).toBeGreaterThan(0)
+      await expect(generateImagesBtnForWait).toBeEnabled()
     }).toPass({ timeout: 300000, intervals: [3000, 5000, 10000] })
-    
-    console.log('✓ All descriptions generated\n')
+
+    console.log('✓ All descriptions generated (生成图片 button enabled)\n')
     await page.screenshot({ path: 'test-results/e2e-descriptions-generated.png' })
     
     // ====================================
@@ -202,11 +208,12 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
         console.log('  Waiting for generation state...')
       })
       
-      // Wait for regeneration to complete (shorter timeout since it's just one card)
-      await page.waitForSelector(
-        'button:has-text("重新生成"):not([disabled])',
-        { timeout: 120000 }
-      )
+      // Wait for regeneration to complete - ensure no cards are still generating
+      // (can't just check for any "重新生成" button as other cards already have one)
+      await expect(async () => {
+        const generatingButtons = await page.locator('button:has-text("生成中...")').count()
+        expect(generatingButtons).toBe(0)
+      }).toPass({ timeout: 120000, intervals: [2000, 5000, 10000] })
       
       console.log('✓ Single card retry completed successfully\n')
       await page.screenshot({ path: 'test-results/e2e-single-card-retry.png' })
@@ -263,8 +270,8 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
 
     // Wait for button to be enabled (it's disabled until all descriptions are generated)
     await generateImagesNavBtn.waitFor({ state: 'visible', timeout: 10000 })
-    // Increase timeout to account for React re-rendering after single card retry
-    await expect(generateImagesNavBtn).toBeEnabled({ timeout: 10000 })
+    // Allow enough time for the single card retry from Step 9 to complete
+    await expect(generateImagesNavBtn).toBeEnabled({ timeout: 30000 })
     
     // Ensure button is in viewport
     await generateImagesNavBtn.scrollIntoViewIfNeeded()
@@ -436,9 +443,9 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
       // The frontend uses pageGeneratingTasks to track per-page generation status.
       // StatusBadge shows "生成中" (orange badge with animate-pulse) during generation.
       // We wait for export button to be enabled (hasAllImages = all pages have generated_image_path).
-      // Use 7 minutes timeout (420000ms) to cover the full generation time (typically 2-5 minutes).
+      // Use 15 minutes timeout (900000ms) to cover retries on API disconnects.
       const startTime = Date.now()
-      const maxWaitTime = 420000 // 7 minutes total
+      const maxWaitTime = 900000 // 15 minutes total
       
       // Helper: Precise selector for "生成中" StatusBadge (orange background)
       // StatusBadge structure: <span class="bg-orange-100 text-orange-600 animate-pulse ...">生成中</span>
@@ -447,7 +454,7 @@ test.describe('UI-driven E2E test: From user interface to PPT export', () => {
       // Helper: Selector for failed status badges (red background)
       const failedBadgeSelector = 'span.bg-red-100.text-red-600'
       // Helper: Selector for completed status badges (green background)
-      const completedBadgeSelector = 'span.bg-green-100.text-green-600'
+      const _completedBadgeSelector = 'span.bg-green-100.text-green-600'
       // Helper: Image selector for generated slide images
       // Generated images are stored at: /files/{project_id}/pages/{page_id}_v{version}.png
       // Template images are at: /files/{project_id}/template/template.png (excluded)
@@ -668,22 +675,26 @@ test.describe('UI E2E - Simplified (skip long waits)', () => {
   test('User flow verification: Only verify UI interactions, do not wait for AI generation', async ({ page }) => {
     console.log('\n🏃 Quick E2E test (verify UI flow, do not wait for generation)\n')
     
-    // Visit homepage
+    // Visit homepage (prevent HelpModal from appearing)
+    await page.addInitScript(() => {
+      localStorage.setItem('hasSeenHelpModal', 'true')
+    })
     await page.goto('http://localhost:3000')
     console.log('✓ Homepage loaded')
-    
+
     // Ensure "一句话生成" tab is selected (it's selected by default)
     await page.click('button:has-text("一句话生成")').catch(() => {
       // If click fails, the tab might already be selected, which is fine
     })
     console.log('✓ Entered create page')
     
-    // Wait for textarea to be visible
-    await page.waitForSelector('textarea', { timeout: 10000 })
-    
+    // Wait for textarea to be visible (MarkdownTextarea uses contentEditable div with role="textbox")
+    await page.waitForSelector('[role="textbox"], textarea', { timeout: 10000 })
+
     // Enter content
-    const ideaInput = page.locator('textarea').first()
-    await ideaInput.fill('E2E test project')
+    const ideaInput = page.locator('[role="textbox"], textarea').first()
+    await ideaInput.click()
+    await ideaInput.pressSequentially('E2E test project')
     console.log('✓ Entered content')
     
     // Click generate

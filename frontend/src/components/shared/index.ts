@@ -15,7 +15,9 @@ export { ReferenceFileSelector } from './ReferenceFileSelector';
 export { FilePreviewModal } from './FilePreviewModal';
 export { ReferenceFileList } from './ReferenceFileList';
 export { MaterialSelector } from './MaterialSelector';
-export { GithubLink } from './GithubLink';
+export { Footer } from './Footer';
+export { GithubBadge } from './GithubBadge';
+export { GithubRepoCard } from './GithubRepoCard';
 export { Markdown } from './Markdown';
 export { AiRefineInput } from './AiRefineInput';
 export { ShimmerOverlay } from './ShimmerOverlay';
@@ -24,5 +26,6 @@ export { ProjectResourcesList } from './ProjectResourcesList';
 export { HelpModal } from './HelpModal';
 export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { ExportTasksPanel } from './ExportTasksPanel';
-
-
+export { AccessCodeGuard } from './AccessCodeGuard';
+export { TextStyleSelector } from './TextStyleSelector';
+export { Pagination } from './Pagination';

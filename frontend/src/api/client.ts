@@ -26,6 +26,12 @@ apiClient.interceptors.request.use(
       }
     }
 
+    // Attach access code header for backend enforcement
+    const accessCode = localStorage.getItem('banana-access-code');
+    if (accessCode && config.headers) {
+      config.headers['X-Access-Code'] = accessCode;
+    }
+
     // 如果请求体是 FormData，删除 Content-Type 让浏览器自动设置
     // 浏览器会自动添加正确的 Content-Type 和 boundary
     if (config.data instanceof FormData) {
