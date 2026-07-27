@@ -23,7 +23,8 @@ from services.task_manager import (
     task_manager,
     generate_descriptions_task,
     generate_images_task,
-    process_ppt_renovation_task
+    process_ppt_renovation_task,
+    get_image_prompt_field_names,
 )
 from utils import (
     success_response, error_response, not_found, bad_request,
@@ -37,6 +38,30 @@ from utils.tenant import (
 logger = logging.getLogger(__name__)
 
 project_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
+
+
+def _get_required_project_content(data, creation_type):
+    """Return normalized content for the selected creation mode.
+
+    'blank' projects start with no source text at all — the user builds the
+    outline by hand or imports it — so there is nothing to validate.
+    """
+    if creation_type == 'blank':
+        return None, None, None
+    field_name = {
+        'idea': 'idea_prompt',
+        'outline': 'outline_text',
+        'descriptions': 'description_text',
+    }[creation_type]
+    value = data.get(field_name)
+    if value is None:
+        return field_name, None, f"{field_name} is required"
+    if not isinstance(value, str):
+        return field_name, None, f"{field_name} must be a string"
+    content = value.strip()
+    if not content:
+        return field_name, None, f"{field_name} must contain non-whitespace text"
+    return field_name, content, None
 
 
 def _get_project_reference_files_content(project_id: str) -> list:
@@ -149,6 +174,18 @@ def _smart_merge_pages(project_id, pages_data):
             'title': page_data.get('title'),
             'points': page_data.get('points', [])
         })
+        description_text = page_data.get('description_text')
+        if description_text:
+            desc_content = {
+                'text': description_text,
+                'generated_at': datetime.utcnow().isoformat(),
+            }
+            if page_data.get('extra_fields'):
+                desc_content['extra_fields'] = page_data['extra_fields']
+            page.set_description_content(desc_content)
+            page.status = 'DESCRIPTION_GENERATED'
+        elif not page.description_content:
+            page.status = 'DRAFT'
         pages_list.append(page)
 
     for p in old_pages[len(pages_data):]:
@@ -228,8 +265,18 @@ def create_project():
         
         creation_type = data.get('creation_type')
         
-        if creation_type not in ['idea', 'outline', 'descriptions']:
+        if creation_type not in ['idea', 'outline', 'descriptions', 'blank']:
             return bad_request("Invalid creation_type")
+
+        _, content, content_error = _get_required_project_content(data, creation_type)
+        if content_error:
+            return bad_request(content_error)
+
+        template_style = data.get('template_style')
+        if template_style is not None:
+            if not isinstance(template_style, str):
+                return bad_request("template_style must be a string")
+            template_style = template_style.strip() or None
         
         # Validate and set aspect ratio if provided
         image_aspect_ratio = '16:9'
@@ -242,10 +289,10 @@ def create_project():
         # Create project with user_id for multi-tenant isolation
         project = Project(
             creation_type=creation_type,
-            idea_prompt=data.get('idea_prompt'),
-            outline_text=data.get('outline_text'),
-            description_text=data.get('description_text'),
-            template_style=data.get('template_style'),
+            idea_prompt=content if creation_type == 'idea' else None,
+            outline_text=content if creation_type == 'outline' else None,
+            description_text=content if creation_type == 'descriptions' else None,
+            template_style=template_style,
             image_aspect_ratio=image_aspect_ratio,
             status='DRAFT',
             user_id=get_current_user_id()  # Set user_id for multi-tenant
@@ -317,6 +364,10 @@ def update_project(project_id):
             return error
         
         data = request.get_json()
+
+        # Update project_title if provided
+        if 'project_title' in data:
+            project.project_title = data['project_title']
         
         # Update idea_prompt if provided
         if 'idea_prompt' in data:
@@ -356,6 +407,10 @@ def update_project(project_id):
             project.export_extractor_method = data['export_extractor_method']
         if 'export_inpaint_method' in data:
             project.export_inpaint_method = data['export_inpaint_method']
+        if 'export_allow_partial' in data:
+            project.export_allow_partial = data['export_allow_partial']
+        if 'enable_icon_subject_extraction' in data:
+            project.enable_icon_subject_extraction = bool(data['enable_icon_subject_extraction'])
         
         # Update page order if provided
         if 'pages_order' in data:
@@ -572,6 +627,8 @@ def generate_outline_stream(project_id):
                         'title': page_data.get('title', ''),
                         'points': page_data.get('points', []),
                         'part': page_data.get('part'),
+                        'description_text': page_data.get('description_text'),
+                        'extra_fields': page_data.get('extra_fields'),
                     })
 
                 # Handle lock_page_count: pad with blank pages if needed
@@ -1020,7 +1077,15 @@ def generate_images(project_id):
         if use_template:
             ref_image_path = file_service.get_template_path(project_id)
         
-        if not ref_image_path and not project.template_style:
+        # Per-page-template (PRD §13): multi-mode projects carry templates on
+        # pages, not on the project, so the project-level check alone would
+        # wrongly block generation. Allow it when any target page has a
+        # per-page template binding (asset or style text).
+        has_page_template = any(
+            getattr(p, 'template_asset_id', None) or getattr(p, 'template_style_text', None)
+            for p in pages
+        )
+        if not ref_image_path and not project.template_style and not has_page_template:
             return bad_request("请先上传模板图片或添加风格描述。")
 
         # Reconstruct outline from pages with part structure
@@ -1079,6 +1144,7 @@ def generate_images(project_id):
 
         # Get app instance for background task
         app = current_app._get_current_object()
+        image_prompt_field_names = get_image_prompt_field_names()
 
         # Submit background task
         task_manager.submit_task(
@@ -1095,7 +1161,8 @@ def generate_images(project_id):
             app,
             combined_requirements if combined_requirements.strip() else None,
             language,
-            selected_page_ids if selected_page_ids else None
+            selected_page_ids if selected_page_ids else None,
+            image_prompt_field_names
         )
         
         # Update project status
@@ -1332,9 +1399,11 @@ def refine_descriptions(project_id):
         # Update pages with refined descriptions
         for page, refined_desc in zip(pages, refined_descriptions):
             desc_content = {
-                "text": refined_desc,
+                "text": refined_desc.get('text', ''),
                 "generated_at": datetime.utcnow().isoformat()
             }
+            if refined_desc.get('extra_fields'):
+                desc_content['extra_fields'] = refined_desc['extra_fields']
             page.set_description_content(desc_content)
             page.status = 'DESCRIPTION_GENERATED'
         
@@ -1391,6 +1460,7 @@ def create_ppt_renovation_project():
 
         keep_layout = request.form.get('keep_layout', 'false').lower() == 'true'
         template_style = request.form.get('template_style', '').strip() or None
+        language = request.form.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
 
         # Create project
         project = Project(
@@ -1409,9 +1479,11 @@ def create_ppt_renovation_project():
         template_dir = project_dir / "template"
         template_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save original file
-        safe_name = secure_filename(file.filename)
-        safe_name = secure_filename(file.filename)
+        # Save original file with a standardized name to avoid encoding issues
+        # (secure_filename strips non-ASCII chars, causing Chinese filenames like
+        # '演示文稿.pdf' to become 'pdf' with no extension, breaking PDF discovery)
+        original_ext = file.filename.rsplit('.', 1)[-1].lower()
+        safe_name = f'original.{original_ext}'
         original_path = template_dir / safe_name
         file.save(str(original_path))
 
@@ -1429,9 +1501,17 @@ def create_ppt_renovation_project():
                     raise ValueError("PDF conversion failed - output file not found")
                 logger.info(f"Converted PPTX to PDF: {pdf_path}")
             except subprocess.TimeoutExpired:
-                raise ValueError("PPTX to PDF conversion timed out")
+                raise ValueError(
+                    "PPTX 转 PDF 超时，请稍后重试或手动转为 PDF 后上传。"
+                    if language == 'zh' else
+                    "PPTX to PDF conversion timed out. Please retry or convert to PDF manually before uploading."
+                )
             except FileNotFoundError:
-                raise ValueError("PPTX conversion requires LibreOffice, which is not installed. Please convert your PPTX to PDF locally before uploading.")
+                raise ValueError(
+                    "PPTX 转换需要安装 LibreOffice，但当前环境未检测到。请在本地将 PPTX 转为 PDF 后再上传。"
+                    if language == 'zh' else
+                    "PPTX conversion requires LibreOffice, which is not installed. Please convert your PPTX to PDF locally before uploading."
+                )
 
         # Convert PDF to page images using PyMuPDF or pdf2image
         pages_dir = project_dir / "pages"
@@ -1558,7 +1638,6 @@ def create_ppt_renovation_project():
             lazyllm_image_caption_source=current_app.config.get('IMAGE_CAPTION_MODEL_SOURCE', 'doubao'),
         )
 
-        language = request.form.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
         app = current_app._get_current_object()
 
         # Submit async task

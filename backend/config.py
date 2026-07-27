@@ -10,6 +10,8 @@ from datetime import timedelta
 _current_file = os.path.realpath(__file__)  # 使用realpath解析所有符号链接
 BASE_DIR = os.path.dirname(_current_file)
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
+DEFAULT_FRONTEND_PORT = 3011
+DEFAULT_BACKEND_PORT = 5011
 
 # Flask配置
 class Config:
@@ -45,7 +47,7 @@ class Config:
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
     GOOGLE_API_BASE = os.getenv('GOOGLE_API_BASE', '')
     
-    # Provider format: gemini | openai | vertex | lazyllm
+    # Provider format: gemini | openai | volcengine | vertex | lazyllm
     AI_PROVIDER_FORMAT = os.getenv('AI_PROVIDER_FORMAT', 'gemini')
 
     # Google Cloud Vertex AI (requires AI_PROVIDER_FORMAT=vertex)
@@ -58,9 +60,13 @@ class Config:
     
     # OpenAI 格式专用配置（当 AI_PROVIDER_FORMAT=openai 时使用）
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')  # 当 AI_PROVIDER_FORMAT=openai 时必须设置
-    OPENAI_API_BASE = os.getenv('OPENAI_API_BASE', 'https://aihubmix.com/v1')
-    OPENAI_TIMEOUT = float(os.getenv('OPENAI_TIMEOUT', '300.0'))  # 增加到 5 分钟（生成清洁背景图需要很长时间）
+    OPENAI_API_BASE = os.getenv('OPENAI_API_BASE', 'https://api.inferera.com/v1')
+    OPENAI_TIMEOUT = float(os.getenv('OPENAI_TIMEOUT', '480.0'))  # 8 分钟：留出 gpt-image-2 生图(~225s)+传输的余量
     OPENAI_MAX_RETRIES = int(os.getenv('OPENAI_MAX_RETRIES', '2'))  # 减少重试次数，避免过多重试导致累积超时
+
+    # 火山方舟 Agent Plans（OpenAI-compatible）
+    VOLCENGINE_API_KEY = os.getenv('VOLCENGINE_API_KEY', '') or os.getenv('ARK_API_KEY', '')
+    VOLCENGINE_API_BASE = os.getenv('VOLCENGINE_API_BASE', 'https://ark.cn-beijing.volces.com/api/v3')
 
     # Anthropic 格式专用配置（当 AI_PROVIDER_FORMAT=anthropic 时使用）
     # 支持 ANTHROPIC_AUTH_TOKEN 作为 ANTHROPIC_API_KEY 的别名
@@ -98,8 +104,8 @@ class Config:
     IMAGE_CAPTION_MODEL = os.getenv('IMAGE_CAPTION_MODEL', 'gemini-3-flash-preview')
     
     # 并发配置
-    MAX_DESCRIPTION_WORKERS = int(os.getenv('MAX_DESCRIPTION_WORKERS', '5'))
-    MAX_IMAGE_WORKERS = int(os.getenv('MAX_IMAGE_WORKERS', '8'))
+    MAX_DESCRIPTION_WORKERS = int(os.getenv('MAX_DESCRIPTION_WORKERS', '20'))
+    MAX_IMAGE_WORKERS = int(os.getenv('MAX_IMAGE_WORKERS', '20'))
     
     # 图片生成配置
     DEFAULT_ASPECT_RATIO = "16:9"
@@ -107,9 +113,10 @@ class Config:
     
     # 日志配置
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+    WERKZEUG_LOG_LEVEL = (os.getenv('WERKZEUG_LOG_LEVEL') or 'INFO').strip().upper()
     
     # CORS配置
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', f'http://localhost:{DEFAULT_FRONTEND_PORT}').split(',')
     
     # 输出语言配置
     # 可选值: 'zh' (中文), 'ja' (日本語), 'en' (English), 'auto' (自动)
@@ -144,6 +151,17 @@ class Config:
     # 格式: 逗号分隔的邮箱列表，如 "user1@gmail.com,user2@gmail.com"
     _allowed_emails_raw = os.getenv('ALLOWED_EMAILS', '')
     ALLOWED_EMAILS = [e.strip().lower() for e in _allowed_emails_raw.split(',') if e.strip()] if _allowed_emails_raw else []
+
+    # TTS 视频导出配置
+    TTS_DEFAULT_VOICE_ZH = os.getenv('TTS_DEFAULT_VOICE_ZH', 'zh-CN-XiaoxiaoNeural')
+    TTS_DEFAULT_VOICE_EN = os.getenv('TTS_DEFAULT_VOICE_EN', 'en-US-JennyNeural')
+    TTS_DEFAULT_VOICE_JA = os.getenv('TTS_DEFAULT_VOICE_JA', 'ja-JP-NanamiNeural')
+    TTS_DEFAULT_RATE = os.getenv('TTS_DEFAULT_RATE', '+0%')
+    VIDEO_OUTPUT_WIDTH = int(os.getenv('VIDEO_OUTPUT_WIDTH', '1920'))
+    VIDEO_OUTPUT_HEIGHT = int(os.getenv('VIDEO_OUTPUT_HEIGHT', '1080'))
+    VIDEO_FPS = int(os.getenv('VIDEO_FPS', '25'))
+    FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')
+    DEFAULT_SILENT_CLIP_DURATION = float(os.getenv('DEFAULT_SILENT_CLIP_DURATION', '3.0'))
 
 
 class DevelopmentConfig(Config):
