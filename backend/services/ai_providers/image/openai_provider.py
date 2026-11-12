@@ -19,6 +19,7 @@ import requests
 import time
 from io import BytesIO
 from typing import Optional, List
+from urllib.parse import urlparse
 from openai import OpenAI
 from PIL import Image
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
@@ -1140,6 +1141,35 @@ class OpenAIImageProvider(ImageProvider):
         if self._is_apimart() and _is_gpt_image_model(self.model):
             self._validate_apimart_reference_images(ref_images)
         try:
+            # OpenRouter's dedicated Image API is distinct from both the
+            # OpenAI images/edits and chat-completions protocols.  Keep the
+            # reference images in order: the current slide is the first one.
+            base = urlparse(self.api_base.rstrip('/'))
+            if (self.model.lower() == 'meta/muse-image'
+                    and base.scheme == 'https'
+                    and base.hostname == 'openrouter.ai'
+                    and base.path.rstrip('/') == '/api/v1'):
+                payload = {'model': self.model, 'prompt': prompt,
+                           'aspect_ratio': aspect_ratio}
+                if ref_images:
+                    payload['input_references'] = [
+                        {'type': 'image_url', 'image_url': {
+                            'url': 'data:image/jpeg;base64,' + self._encode_image_to_base64(image)}}
+                        for image in ref_images
+                    ]
+                response = requests.post(
+                    'https://openrouter.ai/api/v1/images',
+                    headers={'Authorization': f'Bearer {self.api_key}'},
+                    json=payload, timeout=180,
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(f'OpenRouter image request failed (HTTP {response.status_code})')
+                result = response.json()
+                data = result.get('data') if isinstance(result, dict) else None
+                if not isinstance(data, list) or not data:
+                    raise RuntimeError('OpenRouter image API returned no image data')
+                return self._decode_image_response(data[0])
+
             # SenseNova U1 image models expose a JSON API, not the OpenAI SDK's
             # multipart images.edit request. Route them before the generic paths.
             if self._is_sensenova_image_model():
