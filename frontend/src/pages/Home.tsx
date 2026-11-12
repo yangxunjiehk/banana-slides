@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, FolderOpen, History, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, Upload, RefreshCw, FilePlus, ArrowRight, X } from 'lucide-react';
-import { Button, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, MaterialSelector, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard, TextStyleSelector } from '@/components/shared';
+import { Button, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, MaterialSelector, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, TextStyleSelector } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
 import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createPptRenovationProject } from '@/api/endpoints';
@@ -14,7 +14,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste, buildMaterialsMarkdown } from '@/hooks/useImagePaste';
 import type { Material } from '@/types';
 import { useT } from '@/hooks/useT';
-import logoUrl from '@/assets/logo.png';
 import { ASPECT_RATIO_OPTIONS } from '@/config/aspectRatio';
 import { isDesktop } from '@/utils';
 
@@ -784,16 +783,9 @@ export const Home: React.FC = () => {
       <nav className="relative z-50 h-16 md:h-18 bg-white/40 dark:bg-background-primary backdrop-blur-2xl dark:backdrop-blur-none dark:border-b dark:border-border-primary">
 
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between">
-          <div className="flex flex-shrink-0 items-center gap-3">
-            <div className="hidden sm:flex items-center">
-              <img
-                src={logoUrl}
-                alt="蕉幻 Banana Slides Logo"
-                className="h-10 md:h-12 w-auto rounded-lg object-contain"
-              />
-            </div>
-            <span className="whitespace-nowrap text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
-              蕉幻
+          <div className="flex flex-shrink-0 items-center">
+            <span className="whitespace-nowrap text-sm md:text-xl font-bold tracking-wide text-gray-900 dark:text-white">
+              TOYCLOUDHK <span className="hidden sm:inline text-banana-600 dark:text-banana">· AI PPT</span>
             </span>
           </div>
           <div className="flex items-center gap-0 md:gap-3">
@@ -913,11 +905,6 @@ export const Home: React.FC = () => {
                 </>
               )}
             </div>
-            {/* 分隔线 */}
-            <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
-            {/* GitHub 仓库卡片 */}
-            <GithubRepoCard />
-            {/* 分隔线 */}
           </div>
         </div>
       </nav>
