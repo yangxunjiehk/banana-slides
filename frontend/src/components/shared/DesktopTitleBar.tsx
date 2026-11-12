@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, ImagePlus, FolderOpen, Globe, Sun, Moon, Monitor, ChevronDown, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { ImagePlus, FolderOpen, Globe, Sun, Moon, Monitor, ChevronDown, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useT } from '@/hooks/useT';
 import { DESKTOP_TITLEBAR_HEIGHT, isDesktop } from '@/utils';
@@ -149,10 +149,6 @@ export function DesktopTitleBar() {
         </button>
         <button className={navBtnClass} onClick={() => navigate('/history')}>
           <span>{t('history')}</span>
-        </button>
-        <button className={navBtnClass} onClick={() => navigate('/settings')}>
-          <Settings size={14} />
-          <span>{t('settings')}</span>
         </button>
 
         <div style={{ width: 1, height: 16, backgroundColor: isDark ? '#3f3f46' : '#d1d5db', margin: '0 4px' }} />

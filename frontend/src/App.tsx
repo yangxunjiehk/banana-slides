@@ -7,7 +7,6 @@ import { OutlineEditor } from './pages/OutlineEditor';
 import { DetailEditor } from './pages/DetailEditor';
 import { TemplateSetupPage } from './pages/TemplateSetupPage';
 import { SlidePreview } from './pages/SlidePreview';
-import { SettingsPage } from './pages/Settings';
 import { useProjectStore } from './store/useProjectStore';
 import { useToast, AccessCodeGuard, DesktopTitleBar, UpdateChecker } from './components/shared';
 import { getDesktopTopInset } from './components/shared/UpdateChecker';
@@ -48,7 +47,7 @@ function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/landing" element={<Landing />} />
                   <Route path="/history" element={<History />} />
-                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/settings" element={<Navigate to="/" replace />} />
                   <Route path="/project/:projectId/outline" element={<OutlineEditor />} />
                   <Route path="/project/:projectId/detail" element={<DetailEditor />} />
                   <Route path="/project/:projectId/template-setup" element={<TemplateSetupPage />} />

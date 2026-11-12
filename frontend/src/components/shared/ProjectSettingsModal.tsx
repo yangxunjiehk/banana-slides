@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { X, FileText, Settings as SettingsIcon, Download, Sparkles, AlertTriangle, HelpCircle, Lightbulb } from 'lucide-react';
+import { X, FileText, Download, Sparkles, AlertTriangle, HelpCircle, Lightbulb } from 'lucide-react';
 import { Button, Textarea, TextStyleSelector } from '@/components/shared';
 import { useT } from '@/hooks/useT';
-import { Settings } from '@/pages/Settings';
 import type { ExportExtractorMethod, ExportInpaintMethod } from '@/types';
 import { ASPECT_RATIO_OPTIONS } from '@/config/aspectRatio';
 
@@ -111,7 +110,7 @@ interface ProjectSettingsModalProps {
   hasImages?: boolean;
 }
 
-type SettingsTab = 'project' | 'global' | 'export';
+type SettingsTab = 'project' | 'export';
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   isOpen,
@@ -173,7 +172,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
 
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           <aside className="w-full md:w-64 bg-gray-50 dark:bg-background-primary border-b md:border-b-0 md:border-r border-gray-200 dark:border-border-primary flex-shrink-0">
-            <nav className="grid grid-cols-3 gap-2 p-2 md:block md:p-4 md:space-y-2">
+            <nav className="grid grid-cols-2 gap-2 p-2 md:block md:p-4 md:space-y-2">
               <button
                 onClick={() => setActiveTab('project')}
                 className={`w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-2 md:px-4 py-3 rounded-lg transition-all ${
@@ -195,17 +194,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
               >
                 <Download size={20} />
                 <span className="font-medium">{t('projectSettings.exportConfig')}</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('global')}
-                className={`w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-2 md:px-4 py-3 rounded-lg transition-all ${
-                  activeTab === 'global'
-                    ? 'bg-banana-500 text-white shadow-md'
-                    : 'bg-white dark:bg-background-secondary text-gray-700 dark:text-foreground-secondary hover:bg-gray-100 dark:hover:bg-background-hover'
-                }`}
-              >
-                <SettingsIcon size={20} />
-                <span className="font-medium">{t('projectSettings.globalConfig')}</span>
               </button>
             </nav>
           </aside>
@@ -482,17 +470,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="max-w-4xl">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground-primary mb-2">{t('projectSettings.globalConfigTitle')}</h3>
-                  <p className="text-sm text-gray-600 dark:text-foreground-tertiary">
-                    {t('projectSettings.globalConfigDesc')}
-                  </p>
-                </div>
-                <Settings />
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

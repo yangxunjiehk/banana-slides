@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, Upload, RefreshCw, FilePlus, ArrowRight, X } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, History, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, Upload, RefreshCw, FilePlus, ArrowRight, X } from 'lucide-react';
 import { Button, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, MaterialSelector, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard, TextStyleSelector } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
@@ -37,7 +37,7 @@ const homeI18n = {
     home: {
       title: '蕉幻',
       subtitle: 'Vibe your slides like vibe coding',
-      tagline: '基于 nano banana pro 的原生 AI PPT 生成器',
+      tagline: '用一个想法，开始制作你的演示文稿',
       features: {
         oneClick: '一句话生成 PPT',
         naturalEdit: '自然语言修改',
@@ -102,9 +102,9 @@ const homeI18n = {
         pptTip: '建议先在本地将 PPTX 转为 PDF 后再上传，可获得更好的兼容性和更快的处理速度',
         filesAdded: '已添加 {{count}} 个参考文件',
         imageRemoved: '已移除图片',
-        serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
+        serviceTestTip: '请确认服务已正确配置',
         verifying: '正在验证 API 配置...',
-        verifyFailed: '请在设置页配置正确的 API Key，并在页面底部点击「服务测试」验证',
+        verifyFailed: 'AI 服务配置不可用，请联系管理员检查',
       },
     },
   },
@@ -120,7 +120,7 @@ const homeI18n = {
     home: {
       title: 'Banana Slides',
       subtitle: 'Vibe your slides like vibe coding',
-      tagline: 'AI-native PPT generator powered by nano banana pro',
+      tagline: 'Turn an idea into a presentation',
       features: {
         oneClick: 'One-click PPT generation',
         naturalEdit: 'Natural language editing',
@@ -185,9 +185,9 @@ const homeI18n = {
         pptTip: 'We recommend converting your PPTX to PDF locally before uploading for better compatibility and faster processing',
         filesAdded: 'Added {{count}} reference file(s)',
         imageRemoved: 'Image removed',
-        serviceTestTip: 'Test services in Settings first to avoid issues',
+        serviceTestTip: 'Make sure the service is configured correctly',
         verifying: 'Verifying API configuration...',
-        verifyFailed: 'Please configure a valid API Key in Settings and click "Service Test" at the bottom to verify',
+        verifyFailed: 'AI service configuration is unavailable. Please contact your administrator.',
       },
     },
   },
@@ -786,19 +786,19 @@ export const Home: React.FC = () => {
       <nav className="relative z-50 h-16 md:h-18 bg-white/40 dark:bg-background-primary backdrop-blur-2xl dark:backdrop-blur-none dark:border-b dark:border-border-primary">
 
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center">
+          <div className="flex flex-shrink-0 items-center gap-3">
+            <div className="hidden sm:flex items-center">
               <img
                 src={logoUrl}
                 alt="蕉幻 Banana Slides Logo"
                 className="h-10 md:h-12 w-auto rounded-lg object-contain"
               />
             </div>
-            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
+            <span className="whitespace-nowrap text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
               蕉幻
             </span>
           </div>
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-0 md:gap-3">
             {/* 桌面端：带文字的素材生成按钮 */}
             <Button
               variant="ghost"
@@ -841,20 +841,12 @@ export const Home: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={() => navigate('/history')}
-              className="text-xs md:text-sm hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200 font-medium"
+              className="hidden sm:inline-flex text-xs md:text-sm hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200 font-medium"
             >
               <span className="hidden sm:inline">{t('nav.history')}</span>
-              <span className="sm:hidden">{t('nav.history')}</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Settings size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => navigate('/settings')}
-              className="text-xs md:text-sm hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200 font-medium"
-            >
-              <span className="hidden md:inline">{t('nav.settings')}</span>
-            </Button>
+            <Button variant="ghost" size="sm" icon={<History size={16} />}
+              onClick={() => navigate('/history')} className="sm:hidden" title={t('nav.history')} />
             <Button
               variant="ghost"
               size="sm"
@@ -979,7 +971,7 @@ export const Home: React.FC = () => {
         <Card className="p-4 md:p-10 bg-white/90 dark:bg-background-secondary backdrop-blur-xl dark:backdrop-blur-none shadow-2xl dark:shadow-none border-0 dark:border dark:border-border-primary hover:shadow-3xl dark:hover:shadow-none transition-all duration-300 dark:rounded-2xl">
           {/* 选项卡 */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6 md:mb-8">
-            {(Object.keys(tabConfig) as CreationType[]).map((type) => {
+            {(['idea', 'outline'] as const).map((type) => {
               const config = tabConfig[type];
               return (
                 <button
