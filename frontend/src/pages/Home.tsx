@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, History, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, Upload, RefreshCw, FilePlus, ArrowRight, X } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, FolderOpen, History, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, Upload, RefreshCw, FilePlus, ArrowRight, X } from 'lucide-react';
 import { Button, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, MaterialSelector, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard, TextStyleSelector } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
@@ -35,9 +35,8 @@ const homeI18n = {
       theme: { label: '主题模式', light: '浅色', dark: '深色', system: '跟随系统' }
     },
     home: {
-      title: '蕉幻',
-      subtitle: 'Vibe your slides like vibe coding',
-      tagline: '用一个想法，开始制作你的演示文稿',
+      title: '用 AI 制作 PPT',
+      subtitle: '输入想法或大纲，生成并修改幻灯片。',
       features: {
         oneClick: '一句话生成 PPT',
         naturalEdit: '自然语言修改',
@@ -118,9 +117,8 @@ const homeI18n = {
       theme: { label: 'Theme', light: 'Light', dark: 'Dark', system: 'System' }
     },
     home: {
-      title: 'Banana Slides',
-      subtitle: 'Vibe your slides like vibe coding',
-      tagline: 'Turn an idea into a presentation',
+      title: 'Create PPTs with AI',
+      subtitle: 'Turn your ideas or outline into slides, then edit them with AI.',
       features: {
         oneClick: 'One-click PPT generation',
         naturalEdit: 'Natural language editing',
@@ -928,18 +926,13 @@ export const Home: React.FC = () => {
       {/* 主内容 */}
       <main className="relative max-w-5xl mx-auto px-3 md:px-4 py-8 md:py-12">
         {/* Hero 标题区 */}
-        <div className="text-center mb-10 md:mb-16 space-y-4 md:space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 dark:bg-background-secondary backdrop-blur-sm rounded-full shadow-sm dark:shadow-none mb-4">
-            <span className="text-2xl animate-pulse"><Sparkles size={20} className="text-orange-500 dark:text-banana" /></span>
-            <span className="text-sm font-medium text-gray-700 dark:text-foreground-secondary">{t('home.tagline')}</span>
-          </div>
-
+        <div className="text-center mb-8 md:mb-10 space-y-3 md:space-y-4">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-tight">
             <span className="bg-gradient-to-r from-yellow-600 via-orange-500 to-pink-500 dark:from-banana-dark dark:via-banana dark:to-banana-light bg-clip-text text-transparent dark:italic" style={{
               backgroundSize: '200% auto',
               animation: 'gradient 3s ease infinite',
             }}>
-              {i18n.language?.startsWith('zh') ? `${t('home.title')} · Banana Slides` : 'Banana Slides'}
+              {t('home.title')}
             </span>
           </h1>
 
@@ -947,24 +940,6 @@ export const Home: React.FC = () => {
             {t('home.subtitle')}
           </p>
 
-          {/* 特性标签 */}
-          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 pt-4">
-            {[
-              { icon: <Sparkles size={14} className="text-yellow-600 dark:text-banana" />, label: t('home.features.oneClick') },
-              { icon: <FileEdit size={14} className="text-blue-500 dark:text-blue-400" />, label: t('home.features.naturalEdit') },
-              { icon: <Search size={14} className="text-orange-500 dark:text-orange-400" />, label: t('home.features.regionEdit') },
-
-              { icon: <Paperclip size={14} className="text-green-600 dark:text-green-400" />, label: t('home.features.export') },
-            ].map((feature, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-white/70 dark:bg-background-secondary backdrop-blur-sm rounded-full text-xs md:text-sm text-gray-700 dark:text-foreground-secondary border border-gray-200/50 dark:border-border-primary shadow-sm dark:shadow-none hover:shadow-md dark:hover:border-border-hover transition-all hover:scale-105 cursor-default"
-              >
-                {feature.icon}
-                {feature.label}
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* 创建卡片 */}
